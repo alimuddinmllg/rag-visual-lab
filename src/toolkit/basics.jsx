@@ -35,14 +35,17 @@ export function Tabs({ tabs, active, onChange, className = "tabs", tabClass = "t
   );
 }
 
-export function LessonList({ current, builtSet, doneSet = new Set() }) {
+export function LessonList({ current, currentLevel = null, builtSet, doneSet = new Set() }) {
   const { t, tr } = useT();
   return (
     <nav className="card lessons" aria-label={t("lessons")}>
       <div className="levels">
         {LEVELS.map((lv) => (
           <div className="lvwrap" key={lv.n}>
-            <div className="lv">{t("level")} {lv.n} · {tr(lv.name)}</div>
+            <a className="lv" href={`#level-${lv.n}`} aria-current={currentLevel === lv.n ? "page" : undefined}>
+              {t("level")} {lv.n} · {tr(lv.name)}
+              <span className="lvcount">{CURRICULUM.filter((l) => l.level === lv.n && doneSet.has(l.n)).length}/{CURRICULUM.filter((l) => l.level === lv.n).length}</span>
+            </a>
             <ol>
               {CURRICULUM.filter((l) => l.level === lv.n).map((l) => {
                 const built = builtSet.has(l.n);
@@ -63,6 +66,7 @@ export function LessonList({ current, builtSet, doneSet = new Set() }) {
         ))}
       </div>
       <div className="prog">
+        <a className="glink" href="#glossary">{t("glossary")} →</a>
         {t("built", builtSet.size, CURRICULUM.length)}
         <div className="bar"><i style={{ width: `${(builtSet.size / CURRICULUM.length) * 100}%` }} /></div>
       </div>

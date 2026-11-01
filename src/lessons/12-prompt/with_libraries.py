@@ -1,7 +1,8 @@
 # NalarNusa RAG Visual Lab · Lesson 12 · Prompt assembly with real token counts and a chat API
-# pip install openai tiktoken
+# pip install openai tiktoken sentence-transformers
 import tiktoken
 from openai import OpenAI
+from sentence_transformers import SentenceTransformer, util
 
 enc = tiktoken.get_encoding("cl100k_base")
 tokens = lambda s: len(enc.encode(s))
@@ -10,7 +11,10 @@ SYSTEM = ("Answer ONLY using the numbered sources and cite them like [1]. "
 
 # @stage retrieve
 question = "How much does PLA printing cost?"
-top = search(question, k=5)          # [(text, score)], from your retriever (lesson 6, 13 or 14)
+chunks = [p.strip() for p in open("nusabot_handbook.txt", encoding="utf-8").read().split("\n\n") if p.strip()]
+emb = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+hits = util.semantic_search(emb.encode(question), emb.encode(chunks), top_k=5)[0]
+top = [(chunks[h["corpus_id"]], h["score"]) for h in hits]      # any retriever works: lessons 6, 13, 14
 # @end
 
 # @stage order

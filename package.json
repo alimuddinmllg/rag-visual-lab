@@ -1,14 +1,15 @@
 {
   "name": "nalarnusa-rag-visual-lab",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "golden": "node scripts/golden.mjs && node scripts/run-python-check.mjs && node scripts/python-lessons.mjs",
-    "pylessons": "node scripts/python-lessons.mjs"
+    "golden": "node scripts/golden.mjs && node scripts/run-python-check.mjs && node scripts/python-lessons.mjs && node scripts/notebooks.mjs --check",
+    "pylessons": "node scripts/python-lessons.mjs",
+    "notebooks": "node scripts/notebooks.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.7.6",

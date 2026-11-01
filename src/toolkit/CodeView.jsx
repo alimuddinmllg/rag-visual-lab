@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n.js";
 import { runPython, stripLocalImports } from "./pyodide.js";
+import { buildNotebook, colabUrl, notebookName } from "./notebook.js";
 
 export function parseStages(source) {
   const lines = [], ranges = {};
@@ -53,8 +54,8 @@ function highlight(line) {
  *  variables: [[name, value]]
  *  python: { globals, call, compare(result) => bool }   for runnable files
  */
-export default function CodeView({ files, stageOrder, active, doneUpTo, variables, python }) {
-  const { t, tr } = useT();
+export default function CodeView({ files, stageOrder, active, doneUpTo, variables, python, notebook }) {
+  const { t, tr, lang } = useT();
   const [fileId, setFileId] = useState(files[0].id);
   const file = files.find((f) => f.id === fileId) || files[0];
   const parsed = useMemo(() => parseStages(file.source), [file]);
@@ -93,6 +94,14 @@ export default function CodeView({ files, stageOrder, active, doneUpTo, variable
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
+  const saveNotebook = () => {
+    const text = buildNotebook({ n: notebook.n, title: notebook.title, lang, files, python });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/x-ipynb+json" }));
+    a.download = notebookName(notebook.n, lang);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
   const run = async () => {
     setPy({ state: "loading" });
     try {
@@ -119,6 +128,8 @@ export default function CodeView({ files, stageOrder, active, doneUpTo, variable
         <span className="sp" />
         <button className="btn" onClick={copy}>{copied ? t("copied") : t("copy")}</button>
         <button className="btn" onClick={download}>{t("download")}</button>
+        {notebook && <button className="btn" onClick={saveNotebook} title={t("notebookHint")}>{t("notebook")}</button>}
+        {notebook && <a className="btn" href={colabUrl(notebook.n, lang)} target="_blank" rel="noopener noreferrer" title={t("colabHint")}>{t("colab")} ↗</a>}
         {file.runnable && python && (
           <button className="btn primary" onClick={run} disabled={py.state === "loading" || py.state === "running"}>
             ▶ {t("runPython")}

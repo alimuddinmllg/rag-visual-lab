@@ -33,5 +33,10 @@ def rag(question, retriever, llm, top_k=3, min_sim=0.1):
 # @end
 
 # @stage verify
+# Try it with stand-ins, then plug in your real retriever and LLM.
+fake_retriever = lambda q, k: [(7, 0.52, "Saturday from 10:00 to 16:00."), (3, 0.08, "Wear safety glasses.")][:k]
+fake_llm = lambda prompt: "The lab is open on Saturday from 10:00 to 16:00 [1]."
+print(rag("When is the lab open on Saturday?", fake_retriever, fake_llm))
+print(open("rag_trace.jsonl", encoding="utf-8").read())
 # Re-run the whole test set after each fix and compare the scores (lesson 20).
 # @end

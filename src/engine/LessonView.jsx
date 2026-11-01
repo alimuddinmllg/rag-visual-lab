@@ -10,6 +10,8 @@ import { useLessonRunner } from "./useLessonRunner.js";
 import { Monitor, Prose, Slider, StageBar, Tabs } from "../toolkit/basics.jsx";
 import { ChallengePanel, DocPicker, SelectControl } from "../toolkit/LessonParts.jsx";
 import CodeView from "../toolkit/CodeView.jsx";
+import { CURRICULUM } from "./registry.js";
+import { termsForLesson } from "../content/glossary.js";
 
 const EMPTY = {};
 const NO_EXTRA = () => EMPTY; // useExtra must return a memoised object
@@ -81,7 +83,8 @@ export default function LessonView({ lesson }) {
             ? <lesson.DataPanel {...boardProps} />
             : <CodeView key={lesson.n} files={lesson.code} stageOrder={lesson.stages.map((s) => s.id)}
                 active={codeActive} doneUpTo={runner.phase} variables={lesson.variables ? lesson.variables(ctx) : []}
-                python={lesson.python ? lesson.python(ctx) : null} />}
+                python={lesson.python ? lesson.python(ctx) : null}
+                notebook={{ n: lesson.n, title: tr(CURRICULUM.find((l) => l.n === lesson.n)?.title || { en: "", id: "" }) }} />}
         </div>
       </section>
 
@@ -89,7 +92,7 @@ export default function LessonView({ lesson }) {
         <div className="card">
           <Tabs active={rightTab} onChange={setRightTab} tabs={tabs.map((id) => ({ id, label: t("tab_" + id) }))} />
           <div className="pane" role="tabpanel">
-            {rightTab === "overview" && <Prose blocks={tr(T.overview)} />}
+            {rightTab === "overview" && <><Prose blocks={tr(T.overview)} /><LessonTerms n={lesson.n} /></>}
             {rightTab === "pipeline" && (
               <>
                 <p>{t("pipelineIntro")}</p>
@@ -143,5 +146,19 @@ export default function LessonView({ lesson }) {
         <Monitor logs={runner.logs} onClear={runner.clearLogs} />
       </aside>
     </>
+  );
+}
+
+/** "Terms in this lesson": links into the glossary. */
+function LessonTerms({ n }) {
+  const { tr, lang } = useT();
+  const terms = termsForLesson(n);
+  if (!terms.length) return null;
+  return (
+    <p className="note terms" style={{ marginTop: 14 }}>
+      <b>{lang === "id" ? "Istilah di pelajaran ini" : "Terms in this lesson"}:</b>{" "}
+      {terms.map((g, i) => <span key={g.id}>{i ? " · " : ""}<a href={`#glossary/${g.id}`}>{tr(g.term)}</a></span>)}
+      {" · "}<a href="#glossary">{lang === "id" ? "Glosarium lengkap" : "Full glossary"} →</a>
+    </p>
   );
 }

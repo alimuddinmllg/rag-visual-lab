@@ -293,3 +293,21 @@ fieldset.qz legend{font-weight:600;font-size:13.5px;padding:0 4px}
 input[type="range"]{height:28px}
 input[type="checkbox"],input[type="radio"]{width:20px;height:20px;accent-color:var(--accent)}
 .btn{min-height:30px}
+
+/* level links, level page, glossary */
+.lessons a.lv{display:flex;justify-content:space-between;align-items:center;text-decoration:none;color:var(--muted);border-radius:7px;margin:4px 8px 0;padding:8px 8px 4px}
+.lessons a.lv:hover{background:var(--grid);color:var(--ink)}
+.lessons a.lv[aria-current="page"]{background:var(--accent-soft);color:var(--ink)}
+.lessons .lvcount{font-family:var(--mono);letter-spacing:0;text-transform:none}
+.lessons .glink{display:block;margin-bottom:6px;color:var(--accent);font-weight:600;text-decoration:none}
+.tablewrap{overflow-x:auto}
+.lvtable{width:100%;border-collapse:collapse;font-size:13.5px}
+.lvtable th,.lvtable td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.lvtable th{font-size:12px;color:var(--muted);font-weight:600}
+.glist{margin:0;display:grid;gap:4px}
+.gitem{padding:8px 10px;border-radius:8px;border:1px solid transparent}
+.gitem.hl{border-color:var(--accent);background:var(--accent-soft)}
+.gitem dt{font-weight:600}
+.gitem dd{margin:2px 0 0;font-size:14px}
+.gitem dd a{font-size:13px;overflow-wrap:anywhere}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}

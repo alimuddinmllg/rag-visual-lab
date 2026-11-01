@@ -63,6 +63,15 @@ export async function loadFile(file) {
   else if (ext === "docx") ({ text } = await docxToText(await file.arrayBuffer()));
   else if (["txt", "md", "markdown"].includes(ext)) text = markdownToSections(await file.text());
   else throw new Error("unsupported");
+  return makeDoc(name, text, ext, pages);
+}
+
+/** A document from pasted text. Markdown headings (#, ##) become sections, as for .md files. */
+export function docFromText(title, pasted) {
+  return makeDoc((title || "").trim() || "Pasted text", markdownToSections(pasted || ""), "paste");
+}
+
+function makeDoc(name, text, ext, pages) {
   const raw = text;
   text = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
   const words = text.replace(/^## .*$/gm, "").split(/\s+/).filter(Boolean).length;

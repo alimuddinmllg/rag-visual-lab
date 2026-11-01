@@ -4,7 +4,7 @@ Learn retrieval-augmented generation (RAG) by watching it run, changing it, and 
 
 **Built so far: Levels 1–4 (lessons 1–24)**, in English and Bahasa Indonesia, plus:
 
-- **Your own documents**: upload PDF, DOCX, TXT or Markdown in any lesson. Parsed in the browser; never uploaded.
+- **Your own documents**: upload PDF, DOCX, TXT or Markdown, or paste text, in any lesson. Parsed in the browser; never uploaded.
 - **Neural embeddings**: a multilingual sentence model (paraphrase-multilingual-MiniLM-L12-v2) running in a Web Worker.
   Opt-in per lesson (lessons 4, 6, 10, 12); ~120 MB downloaded once from Hugging Face, then cached by the browser.
 - **Challenges and quizzes** in every lesson; progress is saved in the browser and lessons get a ✓ when complete.
@@ -17,6 +17,10 @@ Learn retrieval-augmented generation (RAG) by watching it run, changing it, and 
   against the visual, and a "with libraries" file (sentence-transformers, LangChain, LlamaIndex, Chroma, FAISS,
   rank_bm25, ranx, an OpenAI-compatible client) to run on your own computer.
 - **Every lesson** has at least 3 experiments, 3 challenges and 3 quiz questions, in both languages.
+- **Notebooks**: "Download notebook" gives a Jupyter notebook with the lesson's code, the earlier lessons it builds on,
+  the learner's document and settings; "Open in Colab" opens the pre-built one in `notebooks/` (default settings).
+- **Level pages** (`#level-N`): progress per lesson and a completion message per level. **Glossary** (`#glossary`):
+  53 terms in EN/ID, each linked to its lesson; every lesson's Overview links to its own terms.
 
 | Level | Lessons |
 | --- | --- |
@@ -37,6 +41,7 @@ Gates still open: the Phase 1 class pilot (pre/post quiz) and the Phase 2 public
 | `npm run preview` | Serve the built site at http://localhost:4173 |
 | `npm run golden` | Check that the Python in the Code tabs gives the same numbers as the visuals (38 cases + all 24 lessons in both languages) |
 | `npm run pylessons` | Only the second part: run every lesson's Python with its default settings and compare with the lesson |
+| `npm run notebooks` | Rebuild `notebooks/` after changing any lesson's Python or text. `npm run golden` fails if they are out of date |
 
 `npm run golden` needs Python 3 with numpy (`pip install numpy`). It finds `python3`, `python` or `py` automatically.
 

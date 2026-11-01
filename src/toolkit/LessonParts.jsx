@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n.js";
 import { useDocs } from "../documents/store.jsx";
-import { ACCEPT, loadFile } from "../documents/loaders.js";
+import { ACCEPT, loadFile, docFromText } from "../documents/loaders.js";
 import { useProgress, QUIZ_PASS, isComplete } from "../engine/progress.js";
 import { Inline } from "./basics.jsx";
 
@@ -13,7 +13,17 @@ export function DocPicker({ value, onChange }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const file = useRef(null);
+  const [paste, setPaste] = useState(null);       // { title, text } while the paste box is open
   const current = docs.find((d) => d.id === value);
+
+  const addPasted = () => {
+    setMsg(null);
+    try {
+      const doc = docFromText(paste.title, paste.text);
+      add(doc); onChange(doc.id); setPaste(null);
+      if (doc.meta.truncated) setMsg({ kind: "warn", text: t("truncated") });
+    } catch { setMsg({ kind: "err", text: t("errEmpty") }); }
+  };
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
@@ -41,9 +51,26 @@ export function DocPicker({ value, onChange }) {
         {current?.user && <button className="btn" type="button" onClick={() => { remove(current.id); onChange(null); }}>{t("removeDoc")}</button>}
       </div>
       <input ref={file} type="file" accept={ACCEPT} onChange={onFile} hidden id="docfile" aria-label={t("upload")} />
-      <button className="btn linkish" type="button" onClick={() => file.current?.click()} disabled={busy}>
-        {busy ? t("uploading") : "＋ " + t("upload")}
-      </button>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <button className="btn linkish" type="button" onClick={() => file.current?.click()} disabled={busy}>
+          {busy ? t("uploading") : "＋ " + t("upload")}
+        </button>
+        <button className="btn linkish" type="button" aria-expanded={!!paste} onClick={() => setPaste(paste ? null : { title: "", text: "" })}>
+          {"＋ " + t("pasteText")}
+        </button>
+      </div>
+      {paste && (
+        <div style={{ display: "grid", gap: 6, marginTop: 6 }}>
+          <label className="lbl" htmlFor="paste-title">{t("pasteTitle")}</label>
+          <input id="paste-title" className="docsel" value={paste.title} placeholder={t("pasteTitlePh")} onChange={(e) => setPaste({ ...paste, title: e.target.value })} />
+          <label className="lbl" htmlFor="paste-text">{t("pasteBody")}</label>
+          <textarea id="paste-text" className="docsel" rows={7} value={paste.text} placeholder={t("pasteBodyPh")} onChange={(e) => setPaste({ ...paste, text: e.target.value })} style={{ resize: "vertical", fontFamily: "inherit" }} />
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="btn primary" type="button" onClick={addPasted} disabled={paste.text.trim().split(/\s+/).length < 30}>{t("pasteAdd")}</button>
+            <button className="btn" type="button" onClick={() => setPaste(null)}>{t("cancel")}</button>
+          </div>
+        </div>
+      )}
       <p className="note">{t("uploadHelp")}</p>
       {msg && <p className={msg.kind === "err" ? "note bad" : "note"}>{msg.text}</p>}
       {!savedOk && <p className="note bad">{t("notSaved")}</p>}
