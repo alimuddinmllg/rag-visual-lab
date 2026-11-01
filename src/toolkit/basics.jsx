@@ -35,7 +35,7 @@ export function Tabs({ tabs, active, onChange, className = "tabs", tabClass = "t
   );
 }
 
-export function LessonList({ current, builtSet }) {
+export function LessonList({ current, builtSet, doneSet = new Set() }) {
   const { t, tr } = useT();
   return (
     <nav className="card lessons" aria-label={t("lessons")}>
@@ -53,6 +53,7 @@ export function LessonList({ current, builtSet }) {
                       <span className="n">{pad2(l.n)}</span>
                       <span>{tr(l.title)}</span>
                       {!built && <span className="soon">{t("soon")}</span>}
+                      {doneSet.has(l.n) && <span className="tick" aria-label="done">✓</span>}
                     </a>
                   </li>
                 );

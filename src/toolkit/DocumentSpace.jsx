@@ -27,7 +27,7 @@ function starPath(cx, cy, r) {
  *  runKey: changes on each animated step (restarts CSS animations)
  *  hover / onHover: shared highlight with the chunk list
  */
-export default function DocumentSpace({ points, labels, sections, query, links, threshold, anim, runKey, hover, onHover, text }) {
+export default function DocumentSpace({ points, labels, sections, query, links, threshold, anim, runKey, hover, onHover, text, dimmed = null }) {
   const { tr } = useT();
   const [tip, setTip] = useState(null);
   const wrap = useRef(null);
@@ -78,6 +78,7 @@ export default function DocumentSpace({ points, labels, sections, query, links, 
             style={anim === "embed" ? { animationDelay: `${Math.min(i * 25, 900)}ms` } : undefined}
             cx={x.toFixed(1)} cy={y.toFixed(1)} r={7}
             fill={SECTION_COLORS[labels[i].sec % SECTION_COLORS.length]}
+            opacity={dimmed && dimmed.has(i) ? 0.15 : 1}
             onMouseEnter={(e) => showTip(e, i)} onMouseLeave={() => { onHover?.(null); setTip(null); }} />
         ))}
 

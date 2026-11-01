@@ -33,7 +33,32 @@ const out = CASES.map(([lang, question, size, overlap, topK, minSim]) => ({
   }),
 }));
 
+// Lesson 1 (n-gram LM) and lesson 3 (BPE) twins
+const load = async (rel) => import("data:text/javascript;base64," + Buffer.from(readFileSync(new URL(rel, import.meta.url), "utf8")).toString("base64"));
+const ng = await load("../src/rag/ngram.js");
+const bpe = await load("../src/rag/bpe.js");
+const lmCases = [["en", "PLA prints cost", 20, 0.8, 3], ["en", "the lab", 25, 1.5, 11], ["id", "cetak pla", 15, 0.3, 7]].map(([lang, prompt, steps, temp, seed]) => {
+  const doc = lang === "id" ? docs.NUSABOT_ID : docs.NUSABOT_EN;
+  const lm = ng.trainLM(ng.lmTokens(doc));
+  return { input: { lang, prompt, steps, temp, seed }, words: ng.generate(lm, ng.lmTokens(prompt), steps, temp, seed).map((x) => x.w) };
+});
+const bpeCases = [["en", "How much does PLA printing cost?", 0, 2048], ["en", "Soldering stations and microcontroller boards", 120, 256], ["id", "Mahasiswa meminjam osiloskop", 300, 512]].map(([lang, text, merges, window]) => {
+  const doc = lang === "id" ? docs.NUSABOT_ID : docs.NUSABOT_EN;
+  const m = bpe.trainBPE(bpe.wordFreqs(doc), merges);
+  return { input: { lang, text, merges, window }, tokens: bpe.tokenizeBPE(text, m), n_merges: m.length, doc_tokens: bpe.tokenizeBPE(doc, m).length };
+});
+
+const annSrc = readFileSync(new URL("../src/rag/ann.js", import.meta.url), "utf8")
+  .replace('import { rng } from "./ngram.js";', readFileSync(new URL("../src/rag/ngram.js", import.meta.url), "utf8").match(/export function rng[\s\S]*?\n}\n/)[0]);
+const ann = await import("data:text/javascript;base64," + Buffer.from(annSrc).toString("base64"));
+const annCases = [[300, 7, 4, 8, 0.3, 0.7], [600, 3, 2, 1, 0.9, 0.1], [200, 11, 8, 20, 0.5, 0.5]].map(([n, seed, M, ef, qx, qy]) => {
+  const pts = ann.makePoints(n, seed), nb = ann.buildNSW(pts, M);
+  const b = ann.bruteForce(pts, [qx, qy], 5), g = ann.searchNSW(pts, nb, [qx, qy], 5, ef);
+  return { input: { n, seed, M, ef, qx, qy }, exact: b.top, found: g.top, brute: b.comparisons, graph: g.comparisons };
+});
+
 mkdirSync(new URL("../python/fixtures/", import.meta.url), { recursive: true });
+writeFileSync(new URL("../python/fixtures/js_lessons.json", import.meta.url), JSON.stringify({ lm: lmCases, bpe: bpeCases, ann: annCases }, null, 1));
 writeFileSync(new URL("../python/fixtures/js_output.json", import.meta.url), JSON.stringify(out, null, 1));
 writeFileSync(new URL("../python/fixtures/documents.json", import.meta.url),
   JSON.stringify({ en: docs.NUSABOT_EN, id: docs.NUSABOT_ID, stopwords: STOP }));

@@ -66,6 +66,8 @@ export const experiments = {
     { exp: ["Make chunks huge", "Set chunk size to 120. Chunks start mixing two sections (shown in red as \"A + B\") and the prompt gets much longer."] },
     { exp: ["Swap a word for a synonym", "Compare \"How much does PLA printing cost?\" with \"What is the price of PLA printing?\". The handbook never says \"price\", so that word matches nothing and the top score drops from 0.46 to 0.38. A neural embedding model would treat price and cost as close."] },
     { exp: ["Raise top-k to 8", "Low-scoring chunks join the prompt. In a real system that extra text can distract the model."] },
+    { exp: ["Switch the embedding to Neural", "Ask \"What is the price of PLA printing?\" again. The neural model understands that price and cost mean the same thing. Notice that neural scores are higher across the board, so a minimum similarity of 0.1 no longer filters anything: raise it to about 0.4."] },
+    { exp: ["Use your own document", "Upload a PDF or Word file in Try it yourself and ask it a question. Each PDF page becomes a section colour on the map."] },
   ],
   id: [
     { h: "Eksperimen" },
@@ -74,6 +76,8 @@ export const experiments = {
     { exp: ["Buat potongan sangat besar", "Atur ukuran potongan ke 120. Potongan mulai mencampur dua bagian (ditandai merah \"A + B\") dan prompt menjadi jauh lebih panjang."] },
     { exp: ["Ganti kata dengan sinonim", "Bandingkan \"Berapa biaya cetak PLA?\" dengan \"Berapa harga cetak PLA?\". Buku panduan tidak pernah memakai kata \"harga\", jadi kata itu tidak cocok dengan apa pun dan skor tertinggi turun. Model embedding neural akan menganggap harga dan biaya berdekatan."] },
     { exp: ["Naikkan top-k ke 8", "Potongan berskor rendah ikut masuk ke prompt. Di sistem nyata, teks tambahan ini bisa mengganggu model."] },
+    { exp: ["Ganti embedding ke Neural", "Tanyakan lagi \"Berapa harga cetak PLA?\". Model neural memahami bahwa harga dan biaya bermakna sama. Perhatikan bahwa skor neural lebih tinggi secara umum, jadi kemiripan minimum 0,1 tidak lagi menyaring apa pun: naikkan ke sekitar 0,4."] },
+    { exp: ["Pakai dokumen Anda sendiri", "Unggah file PDF atau Word di Coba sendiri lalu ajukan pertanyaan. Setiap halaman PDF menjadi satu warna bagian di peta."] },
   ],
 };
 
@@ -138,3 +142,49 @@ export const ui = {
   },
   askHandbook: { en: "Ask the handbook", id: "Tanya buku panduan" },
 };
+
+export const challenges = [
+  { id: "fail", text: { en: "Make retrieval fail: ask a question the document can't answer, so the answer is \"I don't know\".", id: "Buat retrieval gagal: tanyakan hal yang tidak bisa dijawab dokumen, sampai jawabannya \"tidak tahu\"." },
+    check: (c) => c.answer && !c.answer.grounded && (c.inputs.question || "").length > 3 },
+  { id: "tiny", text: { en: "Still get a grounded answer with chunk size 20 or smaller.", id: "Tetap dapatkan jawaban berdasar dokumen dengan ukuran potongan 20 atau lebih kecil." },
+    check: (c) => c.answer?.grounded && c.inputs.size <= 20 },
+  { id: "noise", text: { en: "Set top-k to 8 and find a question where at least one retrieved chunk falls below the minimum similarity (a dashed line).", id: "Atur top-k ke 8 dan temukan pertanyaan yang membuat setidaknya satu potongan di bawah kemiripan minimum (garis putus-putus)." },
+    check: (c) => c.top?.length >= 8 && c.top.some((t) => t.s < c.inputs.minSim) },
+  { id: "own", text: { en: "Upload your own document and get a grounded answer from it.", id: "Unggah dokumen Anda sendiri dan dapatkan jawaban berdasar dokumen itu." },
+    check: (c) => c.inputs.doc.user && c.answer?.grounded },
+];
+
+export const quiz = [
+  { q: { en: "In RAG, what is fetched before the model writes an answer?", id: "Dalam RAG, apa yang diambil sebelum model menulis jawaban?" },
+    options: [
+      { en: "New model weights", id: "Bobot model yang baru" },
+      { en: "The most relevant chunks of your documents", id: "Potongan dokumen Anda yang paling relevan" },
+      { en: "The model's previous answers", id: "Jawaban model sebelumnya" },
+      { en: "A random sample of the internet", id: "Sampel acak dari internet" },
+    ], answer: 1,
+    why: { en: "Retrieval finds the chunks closest to the question and pastes them into the prompt. The model itself does not change.", id: "Retrieval mencari potongan yang paling dekat dengan pertanyaan lalu menempelkannya ke prompt. Modelnya sendiri tidak berubah." } },
+  { q: { en: "Why is the question turned into a vector the same way as the chunks?", id: "Mengapa pertanyaan diubah menjadi vektor dengan cara yang sama seperti potongan?" },
+    options: [
+      { en: "So it can be stored in the database", id: "Agar bisa disimpan di database" },
+      { en: "So question and chunks live in the same space and can be compared", id: "Agar pertanyaan dan potongan berada di ruang yang sama dan bisa dibandingkan" },
+      { en: "To make the question shorter", id: "Agar pertanyaan lebih pendek" },
+      { en: "To translate it into English", id: "Untuk menerjemahkannya ke bahasa Inggris" },
+    ], answer: 1,
+    why: { en: "Similarity only makes sense between vectors built the same way, with the same vocabulary or model.", id: "Kemiripan hanya bermakna antara vektor yang dibuat dengan cara yang sama, dengan kosakata atau model yang sama." } },
+  { q: { en: "What usually goes wrong when chunks are very small?", id: "Apa yang biasanya salah jika potongan sangat kecil?" },
+    options: [
+      { en: "The prompt becomes too long", id: "Prompt menjadi terlalu panjang" },
+      { en: "Sentences are cut apart, so a fact loses its context", id: "Kalimat terpotong, sehingga fakta kehilangan konteksnya" },
+      { en: "Retrieval becomes slower than the LLM", id: "Retrieval menjadi lebih lambat dari LLM" },
+      { en: "Nothing: smaller is always better", id: "Tidak ada: lebih kecil selalu lebih baik" },
+    ], answer: 1,
+    why: { en: "A price can land in one chunk and the item it prices in another. Overlap reduces this.", id: "Harga bisa berada di satu potongan dan barangnya di potongan lain. Overlap mengurangi masalah ini." } },
+  { q: { en: "What is the minimum similarity threshold for?", id: "Untuk apa ambang kemiripan minimum?" },
+    options: [
+      { en: "To keep irrelevant chunks out of the prompt, so the model can say \"I don't know\"", id: "Agar potongan yang tidak relevan tidak masuk prompt, sehingga model bisa menjawab \"tidak tahu\"" },
+      { en: "To make the map look nicer", id: "Agar peta terlihat lebih rapi" },
+      { en: "To limit how many words a chunk has", id: "Untuk membatasi jumlah kata dalam potongan" },
+      { en: "To speed up the embedding step", id: "Untuk mempercepat langkah embedding" },
+    ], answer: 0,
+    why: { en: "Without it, top-k always returns something, even when nothing in the document is related.", id: "Tanpa ambang ini, top-k selalu mengembalikan sesuatu, walaupun tidak ada yang terkait di dokumen." } },
+];

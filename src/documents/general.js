@@ -1,0 +1,9 @@
+// "General knowledge" for lesson 2's closed-book model: fictional text about OTHER labs.
+// The model trained on this has never seen the NusaBot handbook, just like a real LLM
+// has never seen your private documents. Its answers sound right but use other labs' facts.
+
+export const GENERAL_EN = `## Makerspaces in general
+At most university makerspaces, PLA prints cost about Rp 3.000 per gram, and some labs charge a flat fee per print. PLA prints cost less than resin prints almost everywhere. Members may borrow up to five items for two weeks at many labs. Members may borrow tools only after a safety induction. The lab coordinator is usually a senior technician who manages bookings. The lab coordinator, Mr. Budi, answers questions by email at many campuses. During exam weeks the lab closes at 20:00 in most universities, and some labs close completely during exam weeks. The lab assistant on duty wears a blue lab coat at many makerspaces. Late returns are charged Rp 10.000 per day at many labs.`;
+
+export const GENERAL_ID = `## Ruang kreasi secara umum
+Di kebanyakan ruang kreasi kampus, cetak PLA dikenakan biaya sekitar Rp 3.000 per gram, dan sebagian lab menarik biaya tetap per cetakan. Cetak PLA dikenakan biaya lebih murah daripada resin hampir di semua tempat. Anggota boleh meminjam paling banyak lima alat selama dua minggu di banyak lab. Anggota boleh meminjam alat hanya setelah pelatihan keselamatan. Koordinator lab biasanya teknisi senior yang mengatur pemesanan. Koordinator lab, Pak Budi, menjawab pertanyaan lewat email di banyak kampus. Selama pekan ujian lab tutup pukul 20.00 di kebanyakan universitas, dan sebagian lab tutup total selama pekan ujian. Asisten lab yang bertugas memakai jas lab biru di banyak ruang kreasi. Keterlambatan pengembalian dikenakan denda Rp 10.000 per hari di banyak lab.`;

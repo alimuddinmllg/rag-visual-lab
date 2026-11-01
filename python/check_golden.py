@@ -37,5 +37,43 @@ for n, case in enumerate(cases, 1):
         print("      " + p[:300])
     failures += bool(problems)
 
-print(f"\n{len(cases) - failures}/{len(cases)} cases match")
+# ---- lesson 1 (n-gram LM) and lesson 3 (BPE) ----
+import importlib.util
+def load(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); return m
+LES = ROOT.parent / "src" / "lessons"
+ng = load(LES / "01-llm" / "ngram.py", "ngram")
+bp = load(LES / "03-tokens" / "bpe.py", "bpe")
+extra = json.loads((ROOT / "fixtures" / "js_lessons.json").read_text())
+total = len(cases)
+for c in extra["lm"]:
+    i = c["input"]; total += 1
+    lm = ng.train_lm(ng.lm_tokens(docs[i["lang"]]))
+    py = ng.generate(lm, ng.lm_tokens(i["prompt"]), i["steps"], i["temp"], i["seed"])
+    ok = py == c["words"]
+    print(f"{'ok  ' if ok else 'FAIL'} [lesson 1] {i['prompt']!r} t={i['temp']} seed={i['seed']}")
+    if not ok: print("      py:", py, "\n      js:", c["words"])
+    failures += not ok
+for c in extra["bpe"]:
+    i = c["input"]; total += 1
+    m = bp.train_bpe(bp.word_freqs(docs[i["lang"]]), i["merges"])
+    toks = bp.tokenize(i["text"], m)
+    ok = toks == c["tokens"] and len(m) == c["n_merges"] and len(bp.tokenize(docs[i["lang"]], m)) == c["doc_tokens"]
+    print(f"{'ok  ' if ok else 'FAIL'} [lesson 3] {i['text']!r} merges={i['merges']}")
+    if not ok: print("      py:", toks[:20], len(m), "\n      js:", c["tokens"][:20], c["n_merges"])
+    failures += not ok
+
+an = load(LES / "11-indexes" / "ann.py", "ann")
+for c in extra["ann"]:
+    i = c["input"]; total += 1
+    pts = an.make_points(i["n"], i["seed"]); nb = an.build_nsw(pts, i["M"])
+    ex, c1 = an.brute_force(pts, (i["qx"], i["qy"]), 5)
+    fo, c2 = an.search_nsw(pts, nb, (i["qx"], i["qy"]), 5, i["ef"])
+    ok = ex == c["exact"] and fo == c["found"] and c1 == c["brute"] and c2 == c["graph"]
+    print(f"{'ok  ' if ok else 'FAIL'} [lesson 11] n={i['n']} M={i['M']} ef={i['ef']}  graph {c2} vs brute {c1} comparisons")
+    if not ok: print("      py:", ex, fo, c1, c2, "\n      js:", c["exact"], c["found"], c["brute"], c["graph"])
+    failures += not ok
+
+print(f"\n{total - failures}/{total} cases match")
 sys.exit(1 if failures else 0)

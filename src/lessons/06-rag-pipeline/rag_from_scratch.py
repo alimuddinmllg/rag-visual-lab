@@ -186,7 +186,7 @@ def extract_answer(used, chunks, known, idf, stop, lang):
             break
         if len(re.split(r"\s+", sent)) < 5:
             continue
-        if any(sent in p[0] or p[0] in sent for p in picks):
+        if any(sent[:40] in p[0] or p[0][:40] in sent for p in picks):   # overlap repeats text
             continue
         if picks and sc < picks[0][1] * 0.6:
             break

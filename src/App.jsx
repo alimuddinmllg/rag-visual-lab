@@ -4,8 +4,10 @@ import { CURRICULUM, lessonHash } from "./engine/registry.js";
 import { LESSONS } from "./lessons/index.js";
 import LessonView from "./engine/LessonView.jsx";
 import { LessonList } from "./toolkit/basics.jsx";
+import { DocsProvider } from "./documents/store.jsx";
+import { useProgress, isComplete } from "./engine/progress.js";
 
-const DEFAULT_LESSON = 6;
+const DEFAULT_LESSON = 1;
 const readHash = () => {
   const m = location.hash.match(/^#lesson-(\d{1,2})$/);
   const n = m ? +m[1] : DEFAULT_LESSON;
@@ -21,6 +23,8 @@ function Shell({ n, setLang }) {
   const meta = CURRICULUM.find((l) => l.n === n);
   const lesson = LESSONS[n];
   const builtSet = useMemo(() => new Set(Object.keys(LESSONS).map(Number)), []);
+  const { progress } = useProgress();
+  const doneSet = new Set(Object.values(LESSONS).filter((l) => isComplete(l, progress[l.n])).map((l) => l.n));
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   return (
     <>
@@ -35,17 +39,17 @@ function Shell({ n, setLang }) {
         </div>
       </header>
       <main className="grid">
-        <LessonList current={n} builtSet={builtSet} />
+        <LessonList current={n} builtSet={builtSet} doneSet={doneSet} />
         {lesson ? <LessonView key={n} lesson={lesson} /> : (
           <section className="card soonpage" style={{ gridColumn: "span 2" }}>
             <span className="phase" style={{ justifySelf: "start" }}>{t("level")} {meta.level} · {String(n).padStart(2, "0")}</span>
             <h2>{tr(meta.title)}</h2>
             <p><b>{t("comingSoonTitle")}.</b> {t("comingSoonBody")}</p>
-            <a className="btn primary" style={{ justifySelf: "start", textDecoration: "none" }} href={"#" + lessonHash(6)}>{t("openLesson6")} →</a>
+            <a className="btn primary" style={{ justifySelf: "start", textDecoration: "none" }} href={"#" + lessonHash(1)}>{t("openLesson6")} →</a>
           </section>
         )}
       </main>
-      <footer>NalarNusa · {lang === "id" ? "Buku panduan NusaBot Robotics Lab adalah teks fiktif untuk latihan." : "The NusaBot Robotics Lab handbook is fictional sample text."}</footer>
+      <footer>NalarNusa · {lang === "id" ? "Buku panduan NusaBot Robotics Lab adalah teks fiktif untuk latihan. Dokumen yang Anda unggah tetap di browser ini." : "The NusaBot Robotics Lab handbook is fictional sample text. Documents you upload stay in this browser."}</footer>
     </>
   );
 }
@@ -61,7 +65,9 @@ export default function App() {
   const setLang = (l) => { setLangState(l); try { localStorage.setItem("lab-lang", l); } catch { /* ignore */ } };
   return (
     <LangContext.Provider value={lang}>
-      <Shell n={n} setLang={setLang} />
+      <DocsProvider>
+        <Shell n={n} setLang={setLang} />
+      </DocsProvider>
     </LangContext.Provider>
   );
 }

@@ -1,10 +1,20 @@
-# NalarNusa RAG Visual Lab — Phase 0
+# NalarNusa RAG Visual Lab — Phase 1
 
 Learn retrieval-augmented generation (RAG) by watching it run, changing it, and reading the code behind it.
-Phase 0 delivers the **lesson engine**, the **visual toolkit**, the **synced code view**, **English + Bahasa Indonesia**,
-and **lesson 6 (Your first RAG pipeline)** rebuilt on top of them. Lessons 1–5 and 7–32 appear in the menu as "soon".
 
-Phase 0 gate (from the project spec): *lesson 6 rebuilt on the engine, code synced* — met.
+**Built so far: Levels 1 and 2 (lessons 1–12)**, in English and Bahasa Indonesia, plus:
+
+- **Your own documents**: upload PDF, DOCX, TXT or Markdown in any lesson. Parsed in the browser; never uploaded.
+- **Neural embeddings**: a multilingual sentence model (paraphrase-multilingual-MiniLM-L12-v2) running in a Web Worker.
+  Opt-in per lesson (lessons 4, 6, 10, 12); ~120 MB downloaded once from Hugging Face, then cached by the browser.
+- **Challenges and quizzes** in every lesson; progress is saved in the browser and lessons get a ✓ when complete.
+
+| Level | Lessons |
+| --- | --- |
+| 1 Foundations | 1 LLMs & hallucination · 2 Closed vs open book · 3 Tokens & context window · 4 Embeddings · 5 Similarity · 6 First RAG pipeline |
+| 2 Building blocks | 7 Loading & cleaning · 8 Chunking strategies · 9 Chunk size by measurement · 10 Metadata filtering · 11 Vector indexes · 12 Prompt budget & citations |
+
+Phase 1 gate (from the project spec): *pilot with one class; pre/post quiz improves*. That part is yours.
 
 ## Run it
 
@@ -14,7 +24,7 @@ Phase 0 gate (from the project spec): *lesson 6 rebuilt on the engine, code sync
 | `npm run dev` | Development server at http://localhost:5173 |
 | `npm run build` | Static site in `dist/` |
 | `npm run preview` | Serve the built site at http://localhost:4173 |
-| `npm run golden` | Check that the Python in the Code tab gives the same numbers as the visual |
+| `npm run golden` | Check that the Python in the Code tabs gives the same numbers as the visuals (18 cases) |
 
 `npm run golden` needs Python 3 with numpy (`pip install numpy`). It finds `python3`, `python` or `py` automatically.
 
@@ -59,17 +69,22 @@ scripts/golden.mjs            golden test, JavaScript side
 
 ### The lesson contract
 
-A lesson is a plain object:
+A lesson is a plain object (see any folder in `src/lessons/`):
 
 | Field | What it is |
 | --- | --- |
+| `n` | Lesson number (matches `engine/registry.js`) |
 | `stages` | `[{ id, label, desc, run(ctx) → partial ctx, log(ctx), live(ctx) }]`. `run` must be pure: the engine recomputes from the inputs every time. |
-| `controls` | Sliders: `{ id, label, min, max, step, default, format?, maxFrom?(values) }` |
-| `Board`, `DataPanel` | React components that draw `ctx` (use toolkit components) |
-| `code` | `[{ id, label, source, runnable }]`. Mark stages in the source with `# @stage <id>` … `# @end` |
-| `variables(ctx)` | `[[name, value]]` for the Live values panel |
-| `python(ctx)` | `{ globals, call, compare(result) }` for "Run this Python in your browser" |
-| `text`, `examples`, `documents`, `defaultDoc`, `defaultQuestion` | Lesson content, all `{ en, id }` |
+| `inputs` | `{ document?: true, question?: true }`: show the document picker (with upload) and/or the question box |
+| `controls` | Sliders `{ id, label, min, max, step, default, format?, maxFrom? }` or selects `{ type: "select", options }` |
+| `extraValues`, `ControlsExtra` | Extra input values and a custom control component (gets `setValue`) |
+| `useExtra(inputs)` | Optional React hook returning a **memoised** object merged into inputs (used for neural vectors) |
+| `Board`, `DataPanel?` | React components that draw `ctx` (use toolkit components) |
+| `code` | `[{ id, label, source, runnable, note? }]`. Mark stages in the source with `# @stage <id>` … `# @end` |
+| `variables(ctx)`, `python(ctx)` | Live values panel; `{ globals, call, compare? }` for "Run this Python in your browser" |
+| `challenges` | `[{ id, text, check(ctx) }]`, ticked automatically when `check` passes |
+| `quiz` | `[{ q, options, answer, why }]`, 80% to pass |
+| `text`, `examples`, `defaultQuestion`, `questionLabel`, `runLabel` | Lesson content, all `{ en, id }` |
 
 ### Adding a lesson
 
@@ -80,14 +95,17 @@ A lesson is a plain object:
 
 ### Rule: visual and code never drift
 
-`src/rag/core.js` and `rag_from_scratch.py` are line-for-line twins. `npm run golden` runs both on 9 cases
-(English and Indonesian, small/large chunks, out-of-scope questions) and compares chunk counts, vocabulary,
-top-k ids and scores, map coordinates, prompt and answer (tolerance 1e-6). Run it before every deploy.
+Where a lesson's Python is a twin of its JavaScript, `npm run golden` checks they agree (18 cases):
+the RAG pipeline (`rag/core.js` ↔ lesson 6, 9 cases incl. Indonesian and out-of-scope questions),
+the n-gram language model (`rag/ngram.js` ↔ lesson 1), BPE (`rag/bpe.js` ↔ lesson 3) and the vector index
+(`rag/ann.js` ↔ lesson 11). Run it before every deploy.
 In the app, "Run this Python in your browser" does the same check live for the learner's current settings.
 
-## Known limits in Phase 0
+## Known limits
 
-- Embeddings are TF-IDF (word matching). Real neural embeddings and own-document upload are Phase 1.
-- "Download .py" is blocked inside the claude.ai preview frame; it works on the deployed site.
+- Lessons 2, 4, 8, 9, 10, 12 show read-only Python (it imports lesson 6's file or needs sentence-transformers).
+- Lesson 9 uses the built-in handbook's test set; own documents need their own test set (lesson 19, Phase 2).
+- Indonesian has no stemmer: "biayanya" does not match "biaya" with TF-IDF. Neural embeddings handle it.
 - Monitor and live-value lines stay in technical English in both languages.
-- The first "Run Python" downloads ~15 MB; later runs are instant.
+- First "Run Python" downloads ~15 MB; first neural run downloads ~120 MB. Both are cached afterwards.
+- "Download .py" is blocked inside the claude.ai preview frame; it works on the deployed site.

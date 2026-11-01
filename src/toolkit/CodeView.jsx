@@ -99,7 +99,7 @@ export default function CodeView({ files, stageOrder, active, doneUpTo, variable
       const timer = setTimeout(() => setPy((p) => (p.state === "loading" ? { state: "running" } : p)), 400);
       const { stdout, result } = await runPython(parsed.code, python.globals, python.call);
       clearTimeout(timer);
-      setPy({ state: "done", stdout, match: python.compare(result) });
+      setPy({ state: "done", stdout, match: python.compare ? python.compare(result) : null });
     } catch (e) {
       setPy({ state: "error", stdout: String(e.message || e) });
     }
@@ -116,7 +116,7 @@ export default function CodeView({ files, stageOrder, active, doneUpTo, variable
         <span className="sp" />
         <button className="btn" onClick={copy}>{copied ? t("copied") : t("copy")}</button>
         <button className="btn" onClick={download}>{t("download")}</button>
-        {file.runnable && (
+        {file.runnable && python && (
           <button className="btn primary" onClick={run} disabled={py.state === "loading" || py.state === "running"}>
             ▶ {t("runPython")}
           </button>
@@ -127,12 +127,13 @@ export default function CodeView({ files, stageOrder, active, doneUpTo, variable
           <pre className="code" ref={pre}>
             {parsed.lines.map((l, i) => <span key={i} className={`ln ${lineClass[i]}`}>{highlight(l)}{"\n"}</span>)}
           </pre>
-          {!file.runnable && <div className="codenote">{t("libsNote")}</div>}
+          {!file.runnable && <div className="codenote">{file.note ? tr(file.note) : t("libsNote")}</div>}
           {file.runnable && py.state !== "idle" && (
             <div className="pyout">
               {py.state === "loading" && <span>{t("loadingPython")}</span>}
               {py.state === "running" && <span>{t("runningPython")}</span>}
-              {py.state === "done" && <span className={py.match ? "ok" : "bad"}>{py.match ? "✓ " + t("pythonMatches") : "✗ " + t("pythonDiffers")}</span>}
+              {py.state === "done" && py.match === null && <span className="ok">{t("output")}</span>}
+              {py.state === "done" && py.match !== null && <span className={py.match ? "ok" : "bad"}>{py.match ? "✓ " + t("pythonMatches") : "✗ " + t("pythonDiffers")}</span>}
               {py.state === "error" && <span className="bad">✗ Error</span>}
               {py.stdout && <pre>{py.stdout}</pre>}
             </div>
@@ -141,6 +142,7 @@ export default function CodeView({ files, stageOrder, active, doneUpTo, variable
         <aside className="vars">
           <h3>{t("variables")}</h3>
           <dl>
+            {!variables.length && <dd>—</dd>}
             {variables.map(([k, v]) => (<div key={k}><dt>{k}</dt><dd>{v}</dd></div>))}
           </dl>
         </aside>

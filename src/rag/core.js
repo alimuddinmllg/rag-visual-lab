@@ -99,12 +99,18 @@ function dot(a, b) {
   return s;
 }
 export function pca2(vectors, vocab) {
-  const n = vectors.length, V = vocab.length;
+  const V = vocab.length;
   const index = new Map(vocab.map((t, i) => [t, i]));
   const X = vectors.map((v) => dense(v, index, V));
+  return { ...pcaDense(X), index };
+}
+
+// PCA to 2D for any list of equal-length dense vectors.
+export function pcaDense(X) {
+  const n = X.length, V = n ? X[0].length : 0;
   const mean = new Float64Array(V);
   for (const a of X) for (let j = 0; j < V; j++) mean[j] += a[j] / n;
-  const Xc = X.map((a) => a.map((x, j) => x - mean[j]));
+  const Xc = X.map((a) => Float64Array.from(a, (x, j) => x - mean[j]));
   let K = Xc.map((a) => Xc.map((b) => dot(a, b)));
   const comps = [];
   for (let c = 0; c < 2; c++) {
@@ -122,17 +128,19 @@ export function pca2(vectors, vocab) {
     comps.push({ v, lam });
     K = K.map((row, i) => row.map((x, j) => x - lam * v[i] * v[j]));
   }
-  const coords = vectors.map((_, i) => comps.map((c) => c.v[i] * Math.sqrt(Math.max(c.lam, 1e-12))));
+  const coords = X.map((_, i) => comps.map((c) => c.v[i] * Math.sqrt(Math.max(c.lam, 1e-12))));
   const axes = comps.map((c) => {
     const a = new Float64Array(V), s = Math.sqrt(Math.max(c.lam, 1e-12));
     Xc.forEach((row, i) => { const f = c.v[i] / s; for (let j = 0; j < V; j++) a[j] += row[j] * f; });
     return a;
   });
-  return { coords, mean, axes, index };
+  return { coords, mean, axes };
 }
 
 export function projectPoint(v, map) {
-  const q = dense(v, map.index, map.mean.length);
+  return projectDense(dense(v, map.index, map.mean.length), map);
+}
+export function projectDense(q, map) {
   return map.axes.map((a) => {
     let s = 0;
     for (let j = 0; j < q.length; j++) s += (q[j] - map.mean[j]) * a[j];
@@ -200,7 +208,8 @@ export function extractAnswer(used, chunks, knownTerms, idf, stop, lang) {
   for (const c of cands) {
     if (picks.length >= 2) break;
     if (c.sent.split(/\s+/).length < 5) continue;
-    if (picks.some((p) => p.sent.includes(c.sent) || c.sent.includes(p.sent))) continue;
+    // overlapping chunks repeat text: skip a sentence that shares its first 40 characters with a pick
+    if (picks.some((p) => p.sent.includes(c.sent.slice(0, 40)) || c.sent.includes(p.sent.slice(0, 40)))) continue;
     if (picks.length && c.sc < picks[0].sc * 0.6) break;
     picks.push(c);
   }
