@@ -40,7 +40,7 @@ export function DocPicker({ value, onChange }) {
         </select>
         {current?.user && <button className="btn" type="button" onClick={() => { remove(current.id); onChange(null); }}>{t("removeDoc")}</button>}
       </div>
-      <input ref={file} type="file" accept={ACCEPT} onChange={onFile} hidden id="docfile" />
+      <input ref={file} type="file" accept={ACCEPT} onChange={onFile} hidden id="docfile" aria-label={t("upload")} />
       <button className="btn linkish" type="button" onClick={() => file.current?.click()} disabled={busy}>
         {busy ? t("uploading") : "＋ " + t("upload")}
       </button>

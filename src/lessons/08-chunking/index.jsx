@@ -4,6 +4,8 @@ import * as ck from "../../rag/chunkers.js";
 import { SECTION_COLORS } from "../../toolkit/DocumentSpace.jsx";
 import * as rag from "../../rag/core.js";
 import pySource from "./chunkers.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const L = (en, id) => ({ en, id });
 const NAMES = { fixed: L("Fixed size", "Ukuran tetap"), sentence: L("Sentence", "Kalimat"), recursive: L("Recursive", "Rekursif"), semantic: L("Semantic", "Semantik") };
@@ -107,7 +109,24 @@ export default {
     { id: "threshold", label: L("Semantic threshold", "Ambang semantik"), min: 0, max: 0.4, step: 0.01, default: 0, format: (v) => v.toFixed(2) },
   ],
   inputs: { document: true },
-  code: [{ id: "chunkers", label: L("Four chunkers", "Empat chunker"), source: pySource, runnable: false, filename: "chunkers.py", note: L("Imports helpers from lesson 6's rag_from_scratch.py; keep both files together.", "Mengimpor fungsi dari rag_from_scratch.py pelajaran 6; simpan kedua file bersama.") }],
+  code: [
+    { id: "chunkers", label: L("Four chunkers (runs here)", "Empat chunker (bisa dijalankan)"), source: pySource, runnable: true, filename: "chunkers.py" },
+    { id: "libs", label: L("With LangChain", "Dengan LangChain"), source: libSource, runnable: false, filename: "chunkers_libraries.py",
+      note: L("Runs on your computer after: pip install langchain-text-splitters langchain-experimental langchain-huggingface", "Jalankan di komputer Anda setelah: pip install langchain-text-splitters langchain-experimental langchain-huggingface") },
+  ],
+  python: (c) => {
+    const doc = c.inputs.doc;
+    return {
+      prelude: prelude("rag"),
+      globals: { TEXT: doc.text, SIZE: c.inputs.size, THRESHOLD: c.inputs.threshold, LANG: doc.lang, STOPWORDS: stopList(doc.lang) },
+      call: "demo(TEXT, SIZE, THRESHOLD, LANG, STOPWORDS)",
+      compare: (res) => {
+        const t = doc.text, n = c.inputs.size;
+        const js = { fixed: ck.fixedChunks(t, n), sentence: ck.sentenceChunks(t, n), recursive: ck.recursiveChunks(t, n), semantic: ck.semanticChunks(t, n, c.inputs.threshold, doc.lang).chunks };
+        return Object.entries(js).every(([k, v]) => res[k].n === v.length && res[k].mid_cut === ck.quality(v).midCut);
+      },
+    };
+  },
   variables: (c) => (c.rows ? Object.entries(c.rows).map(([k, v]) => [`len(${k})`, `${v.length} chunks, ${ck.quality(v).midCut} mid-sentence`]) : []),
   challenges: [
     { id: "nocut", text: L("Find a size where the sentence chunker makes zero mid-sentence cuts while fixed size makes at least 5.", "Temukan ukuran di mana chunker kalimat tidak memotong di tengah kalimat sama sekali sementara ukuran tetap memotong paling sedikit 5."), check: (c) => c.summary && c.summary.sentence.midCut === 0 && c.summary.fixed.midCut >= 5 },

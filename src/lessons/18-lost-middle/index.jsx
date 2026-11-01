@@ -6,6 +6,9 @@ import { testSetFor, TEST_SET, HANDBOOK } from "../../rag/testsets.js";
 import { chat, llmReady, useLLM } from "../../rag/llm.js";
 import { L, pct, getIndex, quizQ } from "../shared.js";
 import { BarList } from "../../toolkit/charts.jsx";
+import pySource from "./compress.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const tok = rag.countTokens;
 export function compress(text, qTokens, stop, lang) {
@@ -93,8 +96,10 @@ const text = {
       { p: "Kalimat yang dicoret dibuang; yang disorot disimpan." }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Compression's risk", "Ask \"When does the lab close during exam weeks?\": does the answer sentence survive? Find one where it doesn't."] }, { exp: ["Positions", "With a local model, run 7 positions. Big modern models are much better at this than older ones; small models still show it."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Risiko pemadatan", "Tanyakan \"Jam berapa lab tutup selama pekan ujian?\": apakah kalimat jawabannya bertahan? Temukan pertanyaan yang jawabannya hilang."] }, { exp: ["Posisi", "Dengan model lokal, jalankan 7 posisi. Model modern besar jauh lebih baik dalam hal ini dibanding model lama; model kecil masih menunjukkannya."] }],
+    en: [{ h: "Experiments" }, { exp: ["Compression's risk", "Ask \"When does the lab close during exam weeks?\": does the answer sentence survive? Find one where it doesn't."] }, { exp: ["Positions", "With a local model, run 7 positions. Big modern models are much better at this than older ones; small models still show it."] },
+      { exp: ["More chunks, more savings", "Raise top-k from 4 to 8 and measure again. More chunks means more sentences that share no words with the question, so compression saves a bigger share. Check whether the answer is still kept."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Risiko pemadatan", "Tanyakan \"Jam berapa lab tutup selama pekan ujian?\": apakah kalimat jawabannya bertahan? Temukan pertanyaan yang jawabannya hilang."] }, { exp: ["Posisi", "Dengan model lokal, jalankan 7 posisi. Model modern besar jauh lebih baik dalam hal ini dibanding model lama; model kecil masih menunjukkannya."] },
+      { exp: ["Lebih banyak potongan, lebih hemat", "Naikkan top-k dari 4 ke 8 lalu ukur lagi. Lebih banyak potongan berarti lebih banyak kalimat yang tidak berbagi kata dengan pertanyaan, sehingga pemadatan menghemat porsi lebih besar. Periksa apakah jawabannya masih tersimpan."] }],
   },
   specs: {
     en: [{ dl: [["Compression rule", "Keep a sentence if it shares at least one content word with the question. Real compressors use a small model to score sentences."], ["Position test", "1 run per position with your connected LLM, temperature 0. Repeat runs and other questions for a fair measurement."], ["Reference", "Liu et al., \"Lost in the Middle: How Language Models Use Long Contexts\", TACL 2024."]] }],
@@ -102,22 +107,6 @@ const text = {
   },
 };
 
-const pySource = `# NalarNusa RAG Visual Lab · Lesson 18 · Context compression and the position test
-# @stage retrieve
-top = retrieve(question)[:k]                       # lesson 6
-# @end
-
-# @stage compress
-def compress(chunk_text, q_tokens):
-    sentences = re.split(r"(?<=[.!?])\\s+", chunk_text)
-    return " ".join(s for s in sentences if set(tokenize(s)) & set(q_tokens))
-# @end
-
-# @stage measure
-# for each test question: is the answer phrase still in the compressed context? how many tokens saved?
-# position test: for p in range(n): put the answer passage at position p, ask the LLM, check the answer
-# @end
-`;
 
 export default {
   n: 18, stages, text, Board,
@@ -127,14 +116,43 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "When does the lab close during exam weeks?", id: "Jam berapa lab tutup selama pekan ujian?" },
   examples: { en: ["When does the lab close during exam weeks?", "How much does PLA printing cost?", "Who should I ask about urgent safety issues?"], id: ["Jam berapa lab tutup selama pekan ujian?", "Berapa biaya cetak PLA?", "Siapa yang dihubungi untuk masalah keselamatan mendesak?"] },
-  code: [{ id: "cmp", label: L("Compression", "Pemadatan"), source: pySource, runnable: false, filename: "compress.py", note: L("Pseudocode around lesson 6's functions.", "Pseudokode di sekitar fungsi pelajaran 6.") }],
+  code: [
+    { id: "cmp", label: L("Compression (runs here)", "Pemadatan (bisa dijalankan)"), source: pySource, runnable: true, filename: "compress.py" },
+    { id: "libs", label: L("Position test with a real LLM", "Uji posisi dengan LLM sungguhan"), source: libSource, runnable: false, filename: "position_test_llm.py",
+      note: L("Runs on your computer after: pip install openai, with Ollama or any OpenAI-compatible server.", "Jalankan di komputer Anda setelah: pip install openai, dengan Ollama atau server lain yang kompatibel dengan OpenAI.") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang, ts = testSetFor(doc), tests = ts ? ts.items : [];
+    return {
+      prelude: prelude("rag", "bm25"),
+      globals: { DOCUMENT: doc.text, QUESTION: I.question || "", TESTS: tests, LANG: lang, STOPWORDS: stopList(lang), K: I.topK },
+      call: "demo(DOCUMENT, QUESTION, [tuple(t) for t in TESTS], LANG, STOPWORDS, K)",
+      compare: (res) => {
+        const idx = getIndex(doc, 40, 8), q = I.question || "", qt = rag.tokenize(q, idx.stop, idx.lang);
+        const top = R.rankBy(R.tfidfScores(idx, q)).slice(0, I.topK);
+        const comp = top.map((t) => compress(idx.chunks[t.i].text, qt, idx.stop, idx.lang)).filter(Boolean).join(" ");
+        if (JSON.stringify(res.top) !== JSON.stringify(top.map((t) => t.i)) || res.comp !== comp) return false;
+        if (!tests.length) return res.evaluation == null;
+        let kept = 0, keptC = 0, tf = 0, tc = 0;
+        for (const [tq, e] of tests) {
+          const qq = rag.tokenize(tq, idx.stop, idx.lang), tp = R.rankBy(R.tfidfScores(idx, tq)).slice(0, I.topK);
+          const full = tp.map((t) => idx.chunks[t.i].text).join(" "), cc = tp.map((t) => compress(idx.chunks[t.i].text, qq, idx.stop, idx.lang)).join(" ");
+          kept += R.norm(full).includes(R.norm(e)); keptC += R.norm(cc).includes(R.norm(e)); tf += tok(full); tc += tok(cc || " ");
+        }
+        const n = tests.length, ev = res.evaluation;
+        return Math.abs(ev.kept - kept / n) < 1e-9 && Math.abs(ev.kept_compressed - keptC / n) < 1e-9 && Math.abs(ev.saved - (1 - tc / tf)) < 1e-9;
+      },
+    };
+  },
   variables: (c) => [["full tokens", c.full ? String(tok(c.full)) : "—"], ["compressed", c.comp != null ? String(tok(c.comp || " ")) : "—"]],
   challenges: [
     { id: "lost", text: L("Find a question where compression removes the answer (it drops below full chunks on the test set, or the answer sentence is struck through).", "Temukan pertanyaan di mana pemadatan membuang jawabannya (turun di bawah potongan utuh di set uji, atau kalimat jawabannya tercoret)."), check: (c) => c.evaluation && c.evaluation.keptC < c.evaluation.kept },
     { id: "save", text: L("Measure how many tokens compression saves on the test set.", "Ukur berapa token yang dihemat pemadatan pada set uji."), check: (c) => !!c.evaluation },
+    { id: "k8", text: L("Measure compression with top-k = 8.", "Ukur pemadatan dengan top-k = 8."), check: (c) => c.inputs.topK === 8 && !!c.evaluation },
   ],
   quiz: [
     quizQ(L("What does \"lost in the middle\" describe?", "Apa yang dijelaskan \"lost in the middle\"?"), [L("Models use the middle of a long context less well than its start and end", "Model kurang baik memakai bagian tengah konteks panjang dibanding awal dan akhirnya"), L("Documents lose their middle pages", "Dokumen kehilangan halaman tengah"), L("Retrieval skips medium-sized chunks", "Retrieval melewatkan potongan berukuran sedang"), L("Tokens are lost during encoding", "Token hilang saat encoding")], 0, L("That's why ordering (lesson 12) and shorter contexts help.", "Karena itu pengurutan (pelajaran 12) dan konteks lebih pendek membantu.")),
     quizQ(L("What is the risk of compressing the context?", "Apa risiko memadatkan konteks?"), [L("Cutting the sentence that holds the answer", "Memotong kalimat yang berisi jawaban"), L("Using more tokens", "Memakai lebih banyak token"), L("Slower retrieval", "Retrieval lebih lambat"), L("None", "Tidak ada")], 0, L("Measure answer retention, not just tokens saved.", "Ukur apakah jawaban tetap ada, bukan hanya token yang dihemat.")),
+    quizQ(L("The position test shows ✓ at positions 1 and 7 but ✗ in the middle. What should you change?", "Uji posisi menunjukkan ✓ di posisi 1 dan 7 tetapi ✗ di tengah. Apa yang sebaiknya diubah?"), [L("Send fewer passages, and put the strongest at the start and end", "Kirim lebih sedikit bagian, dan taruh yang terkuat di awal dan akhir"), L("Send more passages", "Kirim lebih banyak bagian"), L("Raise the temperature", "Naikkan temperatur"), L("Nothing: the model is fine", "Tidak ada: modelnya baik-baik saja")], 0, L("Shorter contexts and the \"edges\" order from lesson 12 both work around the weak middle.", "Konteks yang lebih pendek dan urutan \"tepi\" dari pelajaran 12 sama-sama mengatasi bagian tengah yang lemah.")),
   ],
 };

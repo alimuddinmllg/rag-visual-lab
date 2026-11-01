@@ -1,5 +1,6 @@
 // Lesson 5: dot product, length, cosine similarity and distance, drawn on a plane.
 import pySource from "./similarity.py?raw";
+import libSource from "./with_libraries.py?raw";
 
 const L = (en, id) => ({ en, id });
 const vec = (deg, len) => [len * Math.cos((deg * Math.PI) / 180), len * Math.sin((deg * Math.PI) / 180)];
@@ -116,6 +117,16 @@ const text = {
       { ol: ["Tekan **Langkah** lima kali dan lihat setiap besaran muncul.", "Buat A dan B searah tetapi panjangnya berbeda: bandingkan cosine dan jarak."] },
     ],
   },
+  experiments: {
+    en: [{ h: "Experiments" },
+      { exp: ["Same direction, different length", "Set both angles to 40°, A length 2.0 and B length 0.5. Cosine is 1.00, the distance is 1.50 and the dot product is 1.00. Only cosine says they mean the same thing."] },
+      { exp: ["Right angle", "Set A to 0° and B to 90°. The dot product and cosine drop to 0: the vectors share nothing. In TF-IDF this is two sentences with no words in common."] },
+      { exp: ["Opposite", "Set A to 0° and B to 180°. Cosine is −1. Text embeddings rarely go this far; most unrelated sentences sit near 0."] }],
+    id: [{ h: "Eksperimen" },
+      { exp: ["Searah, panjang berbeda", "Atur kedua sudut 40°, panjang A 2,0 dan panjang B 0,5. Cosine 1,00, jarak 1,50 dan perkalian titik 1,00. Hanya cosine yang menyatakan keduanya bermakna sama."] },
+      { exp: ["Sudut siku-siku", "Atur A ke 0° dan B ke 90°. Perkalian titik dan cosine turun ke 0: kedua vektor tidak berbagi apa pun. Dalam TF-IDF ini adalah dua kalimat tanpa kata yang sama."] },
+      { exp: ["Berlawanan", "Atur A ke 0° dan B ke 180°. Cosine −1. Embedding teks jarang sejauh ini; kalimat yang tidak berhubungan biasanya mendekati 0."] }],
+  },
   specs: {
     en: [{ dl: [["Dot product", "A·B = Σ aᵢbᵢ"], ["Length", "|A| = √(Σ aᵢ²)"], ["Cosine similarity", "A·B / (|A| |B|), between −1 and 1"], ["Euclidean distance", "|A − B|"], ["Normalised vectors", "When |A| = |B| = 1, cosine = dot product, and distance² = 2 − 2·cosine. All three then rank results the same way."]] }],
     id: [{ dl: [["Perkalian titik", "A·B = Σ aᵢbᵢ"], ["Panjang", "|A| = √(Σ aᵢ²)"], ["Cosine similarity", "A·B / (|A| |B|), antara −1 dan 1"], ["Jarak Euclidean", "|A − B|"], ["Vektor ternormalisasi", "Jika |A| = |B| = 1, cosine = perkalian titik, dan jarak² = 2 − 2·cosine. Ketiganya lalu mengurutkan hasil dengan cara yang sama."]] }],
@@ -125,7 +136,8 @@ const text = {
 export default {
   n: 5,
   stages, controls, text, Board,
-  code: [{ id: "sim", label: L("Similarity (runs here)", "Kemiripan (bisa dijalankan)"), source: pySource, runnable: true, filename: "similarity.py" }],
+  code: [{ id: "sim", label: L("Similarity (runs here)", "Kemiripan (bisa dijalankan)"), source: pySource, runnable: true, filename: "similarity.py" },
+    { id: "libs", label: L("With libraries", "Dengan pustaka"), source: libSource, runnable: false, filename: "similarity_libraries.py", note: L("Runs on your computer after: pip install numpy scikit-learn sentence-transformers", "Jalankan di komputer Anda setelah: pip install numpy scikit-learn sentence-transformers") }],
   variables: (c) => [["dot(a, b)", c.dot != null ? f3(c.dot) : "—"], ["length(a), length(b)", c.la != null ? `${f3(c.la)}, ${f3(c.lb)}` : "—"], ["cosine(a, b)", c.cos != null ? f3(c.cos) : "—"], ["euclidean(a, b)", c.dist != null ? f3(c.dist) : "—"]],
   python: (c) => ({
     globals: { AA: c.inputs.angleA, LA: c.inputs.lenA, AB: c.inputs.angleB, LB: c.inputs.lenB },

@@ -4,6 +4,9 @@ import { L, getIndex, useNeuralForIndex, vectorRank, bm25Rank, vectorMethodContr
 import RankLists from "../../toolkit/RankLists.jsx";
 import { NeuralStatus } from "../../toolkit/LessonParts.jsx";
 import pySource from "./bm25.py?raw";
+import libSource from "./with_libraries.py?raw";
+import * as R from "../../rag/retrieval.js";
+import { prelude, stopList } from "../prelude.js";
 
 const stages = [
   { id: "tokens", label: L("Index", "Indeks"), desc: L("Chunk the document and list the words in each chunk.", "Potong dokumen dan catat kata-kata di setiap potongan."),
@@ -44,8 +47,10 @@ const text = {
       { h: "Coba" }, { ol: ["Tanyakan istilah persis seperti \"KiCad\" atau \"QRIS\": BM25 sangat yakin.", "Ganti sisi vektor ke **Neural** dan tanyakan \"Berapa harga mencetak?\": kedua daftar berbeda pendapat."] }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["k1 (saturation)", "At k1 = 0 a word counts the same once or ten times. Raise it and repeated words count more."] }, { exp: ["b (length)", "At b = 0 long chunks are not penalised; at 1 fully. Watch long chunks move."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["k1 (kejenuhan)", "Pada k1 = 0 kata yang muncul sekali atau sepuluh kali dihitung sama. Naikkan dan kata yang berulang bernilai lebih."] }, { exp: ["b (panjang)", "Pada b = 0 potongan panjang tidak dikurangi; pada 1 dikurangi penuh. Perhatikan potongan panjang bergeser."] }],
+    en: [{ h: "Experiments" }, { exp: ["k1 (saturation)", "At k1 = 0 a word counts the same once or ten times. Raise it and repeated words count more."] }, { exp: ["b (length)", "At b = 0 long chunks are not penalised; at 1 fully. Watch long chunks move."] },
+      { exp: ["Exact code", "Ask \"KiCad\" alone. BM25 puts the chunks with that rare word on top and gives every other chunk 0. Then ask \"What is the price of printing?\": BM25 can only use \"print\", because \"price\" never appears in the handbook. The neural vector search also understands \"price\"."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["k1 (kejenuhan)", "Pada k1 = 0 kata yang muncul sekali atau sepuluh kali dihitung sama. Naikkan dan kata yang berulang bernilai lebih."] }, { exp: ["b (panjang)", "Pada b = 0 potongan panjang tidak dikurangi; pada 1 dikurangi penuh. Perhatikan potongan panjang bergeser."] },
+      { exp: ["Kode persis", "Tanyakan \"KiCad\" saja. BM25 menaruh potongan yang berisi kata langka itu di atas dan memberi semua potongan lain nilai 0. Lalu tanyakan \"Berapa harga mencetak?\": BM25 hanya bisa memakai \"mencetak\", karena \"harga\" tidak pernah muncul di buku panduan. Pencarian vektor neural juga memahami \"harga\"."] }],
   },
   specs: {
     en: [{ dl: [["BM25", "Σ idf(t) · f(t)·(k1+1) / (f(t) + k1·(1 − b + b·len/avglen)) over query words t."], ["Defaults", "k1 = 1.2, b = 0.75: the values most search engines start from."], ["Where it's used", "Elasticsearch, OpenSearch, Lucene, PostgreSQL full-text extensions, and the keyword half of most hybrid RAG systems."]] }],
@@ -61,7 +66,24 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "What software is on the workstations?", id: "Perangkat lunak apa yang ada di komputer kerja?" },
   examples: { en: ["What software is on the workstations?", "KiCad", "What is the price of printing?", "Can I pay with QRIS?"], id: ["Perangkat lunak apa yang ada di komputer kerja?", "KiCad", "Berapa harga mencetak?", "Apakah bisa bayar pakai QRIS?"] },
-  code: [{ id: "bm25", label: L("BM25", "BM25"), source: pySource, runnable: false, filename: "bm25.py", note: L("Imports lesson 6's rag_from_scratch.py. Checked against the JavaScript by npm run golden.", "Mengimpor rag_from_scratch.py pelajaran 6. Dicek terhadap JavaScript oleh npm run golden.") }],
+  code: [
+    { id: "bm25", label: L("BM25 (runs here)", "BM25 (bisa dijalankan)"), source: pySource, runnable: true, filename: "bm25.py" },
+    { id: "libs", label: L("With rank_bm25", "Dengan rank_bm25"), source: libSource, runnable: false, filename: "bm25_libraries.py",
+      note: L("Runs on your computer after: pip install rank-bm25 sentence-transformers", "Jalankan di komputer Anda setelah: pip install rank-bm25 sentence-transformers") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang;
+    return {
+      prelude: prelude("rag"),
+      globals: { DOCUMENT: doc.text, QUESTION: I.question || "", LANG: lang, STOPWORDS: stopList(lang), K1: I.k1, B: I.b },
+      call: "demo(DOCUMENT, QUESTION, LANG, STOPWORDS, K1, B)",
+      compare: (res) => {
+        const idx = getIndex(doc, 40, 8), q = I.question || "";
+        const bm = bm25Rank(idx, q, I.k1, I.b).slice(0, 5).map((x) => x.i), vec = R.rankBy(R.tfidfScores(idx, q)).slice(0, 5).map((x) => x.i);
+        return JSON.stringify(res.bm25) === JSON.stringify(bm) && JSON.stringify(res.vector) === JSON.stringify(vec);
+      },
+    };
+  },
   variables: (c) => [["k1, b", `${c.inputs.k1}, ${c.inputs.b}`], ["bm25 top", c.bm ? c.bm.slice(0, 5).map((x) => x.i).join(", ") : "—"], ["vector top", c.vec ? c.vec.slice(0, 5).map((x) => x.i).join(", ") : "—"]],
   challenges: [
     { id: "disagree", text: L("Find a question where BM25 and vector search pick a different #1.", "Temukan pertanyaan yang membuat BM25 dan pencarian vektor memilih #1 yang berbeda."), check: (c) => c.sameTop === false },

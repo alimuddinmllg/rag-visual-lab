@@ -87,3 +87,26 @@ def semantic_chunks(text, size, threshold, lang, stop):
         out.append({"text": " ".join(x["text"] for x in cur), "words": n, "sec": cur[0]["sec"]})
     return out
 # @end
+
+
+# @stage compare
+def quality(chunks):
+    """How many chunks, their average size, and how many stop in the middle of a sentence."""
+    mid = sum(not re.search(r"[.!?]$", c["text"]) for c in chunks)
+    avg = sum(len(c["text"].split()) for c in chunks) / max(1, len(chunks))
+    return {"n": len(chunks), "avg": round(avg, 1), "mid_cut": mid}
+
+
+def demo(text, size, threshold, lang, stop):
+    rows = {
+        "fixed": fixed_chunks(text, size),
+        "sentence": sentence_chunks(text, size),
+        "recursive": recursive_chunks(text, size),
+        "semantic": semantic_chunks(text, size, threshold, lang, set(stop)),
+    }
+    summary = {k: quality(v) for k, v in rows.items()}
+    print(f"{'chunker':10s} {'chunks':>6s} {'avg words':>9s} {'mid-sentence':>12s}")
+    for k, q in summary.items():
+        print(f"{k:10s} {q['n']:6d} {q['avg']:9.1f} {q['mid_cut']:12d}")
+    return summary
+# @end

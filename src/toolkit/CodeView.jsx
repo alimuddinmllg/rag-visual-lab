@@ -8,7 +8,7 @@
 // The markers are removed before display; the line ranges drive highlighting.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n.js";
-import { runPython } from "./pyodide.js";
+import { runPython, stripLocalImports } from "./pyodide.js";
 
 export function parseStages(source) {
   const lines = [], ranges = {};
@@ -97,7 +97,10 @@ export default function CodeView({ files, stageOrder, active, doneUpTo, variable
     setPy({ state: "loading" });
     try {
       const timer = setTimeout(() => setPy((p) => (p.state === "loading" ? { state: "running" } : p)), 400);
-      const { stdout, result } = await runPython(parsed.code, python.globals, python.call);
+      // Lessons that build on earlier lessons run those files first (the "prelude"),
+      // so their own imports of local modules are skipped here.
+      const own = stripLocalImports(parsed.code);
+      const { stdout, result } = await runPython((python.prelude || "") + "\n" + own, python.globals, python.call);
       clearTimeout(timer);
       setPy({ state: "done", stdout, match: python.compare ? python.compare(result) : null });
     } catch (e) {

@@ -6,6 +6,8 @@ import { methodControl } from "../../rag/stages.js";
 import DocumentSpace from "../../toolkit/DocumentSpace.jsx";
 import { NeuralStatus } from "../../toolkit/LessonParts.jsx";
 import pySource from "./embeddings.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const L = (en, id) => ({ en, id });
 const LIMIT = 80;
@@ -139,8 +141,26 @@ export default {
   runLabel: L("Place it", "Letakkan"),
   defaultQuestion: { en: "What is the price of printing?", id: "Berapa harga mencetak?" },
   examples: { en: ["What is the price of printing?", "Can I borrow a drone?", "Is the lab open at the weekend?", "Who do I contact about safety?"], id: ["Berapa harga mencetak?", "Can I borrow a drone?", "Apakah lab buka saat akhir pekan?", "Siapa yang dihubungi soal keselamatan?"] },
-  code: [{ id: "emb", label: L("Embeddings", "Embedding"), source: pySource, runnable: false, filename: "embeddings.py",
-    note: L("Uses numpy and sentence-transformers. Run it on your computer after: pip install sentence-transformers numpy", "Memakai numpy dan sentence-transformers. Jalankan di komputer Anda setelah: pip install sentence-transformers numpy") }],
+  code: [
+    { id: "emb", label: L("TF-IDF embeddings (runs here)", "Embedding TF-IDF (bisa dijalankan)"), source: pySource, runnable: true, filename: "embeddings.py" },
+    { id: "libs", label: L("Neural, with libraries", "Neural, dengan pustaka"), source: libSource, runnable: false, filename: "embeddings_libraries.py",
+      note: L("Runs on your computer after: pip install sentence-transformers scikit-learn", "Jalankan di komputer Anda setelah: pip install sentence-transformers scikit-learn") },
+  ],
+  python: (c) => {
+    const doc = c.inputs.doc, lang = doc.lang, k = c.inputs.k || 3;
+    return {
+      prelude: prelude("rag"),
+      globals: { DOCUMENT: doc.text, PROBE: c.inputs.question || "", LANG: lang, STOPWORDS: stopList(lang), K: k },
+      call: "demo(DOCUMENT, PROBE, LANG, STOPWORDS, K)",
+      compare: (res) => {
+        const { sentences } = splitSentences(doc.text), stop = rag.stopwordsFor(lang);
+        const e = rag.embedChunks(sentences, stop, lang);
+        const qv = rag.vectorize(rag.tokenize(c.inputs.question || "", stop, lang), e.idf);
+        const top = e.vectors.map((v, i) => ({ i, s: qv.size ? rag.cosine(qv, v) : 0 })).sort((a, b) => b.s - a.s).slice(0, k);
+        return res.top.length === top.length && res.top.every(([i, s], j) => i === top[j].i && Math.abs(s - top[j].s) < 1e-9);
+      },
+    };
+  },
   variables: (c) => [["method", c.method || "—"], ["len(sentences)", c.chunks ? String(c.chunks.length) : "—"], ["dims", c.dims ? String(c.dims) : "—"], ["nearest", c.top ? c.top.map((t) => `(${t.i}, ${t.s.toFixed(2)})`).join(", ") : "—"]],
   challenges: [
     { id: "neural", text: L("Switch to the neural embedding and place a sentence.", "Ganti ke embedding neural dan letakkan sebuah kalimat."), check: (c) => c.method === "neural" && c.top },

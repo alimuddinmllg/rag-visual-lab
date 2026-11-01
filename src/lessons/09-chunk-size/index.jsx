@@ -3,6 +3,8 @@ import * as rag from "../../rag/core.js";
 import { NUSABOT_EN, NUSABOT_ID } from "../../documents/nusabot.js";
 import { LineChart } from "../../toolkit/charts.jsx";
 import pySource from "./sweep.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const L = (en, id) => ({ en, id });
 const norm = (s) => " " + s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
@@ -119,8 +121,10 @@ const text = {
     ],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Top-1", "Set top-k to 1. Small chunks suffer most: the single best chunk often holds only half the answer."] }, { exp: ["Overlap", "Add 10 words of overlap and check whether the small sizes improve. Measure it rather than assuming it."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Top-1", "Atur top-k ke 1. Potongan kecil paling dirugikan: satu potongan terbaik sering hanya berisi setengah jawaban."] }, { exp: ["Overlap", "Tambahkan overlap 10 kata dan periksa apakah ukuran kecil membaik. Ukur, jangan berasumsi."] }],
+    en: [{ h: "Experiments" }, { exp: ["Top-1", "Set top-k to 1. Small chunks suffer most: the single best chunk often holds only half the answer."] }, { exp: ["Overlap", "Add 10 words of overlap and check whether the small sizes improve. Measure it rather than assuming it."] },
+      { exp: ["Another language", "Switch the lab to Bahasa Indonesia and run the sweep again. The same handbook in another language has different sentence lengths, so the best size can change. Never reuse a size without re-measuring."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Top-1", "Atur top-k ke 1. Potongan kecil paling dirugikan: satu potongan terbaik sering hanya berisi setengah jawaban."] }, { exp: ["Overlap", "Tambahkan overlap 10 kata dan periksa apakah ukuran kecil membaik. Ukur, jangan berasumsi."] },
+      { exp: ["Bahasa lain", "Ganti lab ke bahasa Inggris dan jalankan sapuan lagi. Buku panduan yang sama dalam bahasa lain punya panjang kalimat berbeda, sehingga ukuran terbaik bisa berubah. Jangan memakai ulang ukuran tanpa mengukur ulang."] }],
   },
   specs: {
     en: [{ dl: [["Test set", "10 questions about the built-in handbook, each with a phrase the right chunk must contain. For your own documents, write your own (lesson 19)."], ["Hit rate", "Also called recall@k when there is one relevant passage per question."], ["Prompt size", "Average words in the top-k chunks × 1.33 tokens per word."]] }],
@@ -135,11 +139,29 @@ export default {
     { id: "overlap", label: L("Overlap", "Overlap"), min: 0, max: 20, step: 2, default: 0, format: (v, tr) => `${v} ${tr(L("words", "kata"))}` },
     { id: "topK", label: L("Top-k", "Top-k"), min: 1, max: 5, step: 1, default: 2 },
   ],
-  code: [{ id: "sweep", label: L("Size sweep", "Sapu ukuran"), source: pySource, runnable: false, filename: "sweep.py", note: L("Imports from lesson 6's rag_from_scratch.py.", "Mengimpor dari rag_from_scratch.py pelajaran 6.") }],
+  code: [
+    { id: "sweep", label: L("Size sweep (runs here)", "Sapu ukuran (bisa dijalankan)"), source: pySource, runnable: true, filename: "sweep.py" },
+    { id: "libs", label: L("With libraries", "Dengan pustaka"), source: libSource, runnable: false, filename: "sweep_libraries.py",
+      note: L("Runs on your computer after: pip install langchain-text-splitters sentence-transformers", "Jalankan di komputer Anda setelah: pip install langchain-text-splitters sentence-transformers") },
+  ],
+  python: (c) => {
+    const lang = c.inputs.lang, doc = lang === "id" ? NUSABOT_ID : NUSABOT_EN;
+    return {
+      prelude: prelude("rag"),
+      globals: { DOCUMENT: doc, TESTS: TEST_SET[lang], OVERLAP: c.inputs.overlap, TOP_K: c.inputs.topK, LANG: lang, STOPWORDS: stopList(lang) },
+      call: "best_size(DOCUMENT, [tuple(t) for t in TESTS], OVERLAP, TOP_K, LANG, STOPWORDS)",
+      compare: (res) => {
+        const js = SIZES.map((s) => evaluate(doc, lang, TEST_SET[lang], s, c.inputs.overlap, c.inputs.topK));
+        const best = [...js].sort((a, b) => b.rate - a.rate || a.size - b.size)[0];
+        return res.best === best.size && res.rates.every((r, i) => Math.abs(r - js[i].rate) < 1e-9);
+      },
+    };
+  },
   variables: (c) => (c.results ? c.results.map((r) => [`size ${r.size}`, `${Math.round(r.rate * 100)}% · ~${Math.round(r.tokens)} tok`]) : []),
   challenges: [
     { id: "top1", text: L("Set top-k to 1 and find the best chunk size.", "Atur top-k ke 1 dan temukan ukuran potongan terbaik."), check: (c) => c.inputs.topK === 1 && c.best },
     { id: "perfect", text: L("Find settings that reach a 100% hit rate.", "Temukan pengaturan yang mencapai hit rate 100%."), check: (c) => c.best && c.best.rate === 1 },
+    { id: "overlap", text: L("Turn overlap up to 10 words or more. Does any size improve, and what does it cost in tokens?", "Naikkan overlap ke 10 kata atau lebih. Apakah ada ukuran yang membaik, dan berapa biayanya dalam token?"), check: (c) => c.inputs.overlap >= 10 && c.best },
   ],
   quiz: [
     { q: L("What does hit rate measure?", "Apa yang diukur hit rate?"),

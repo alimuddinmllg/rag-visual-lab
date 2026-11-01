@@ -5,6 +5,8 @@ import * as S from "../../rag/stages.js";
 import { SECTION_COLORS } from "../../toolkit/DocumentSpace.jsx";
 import { NeuralStatus } from "../../toolkit/LessonParts.jsx";
 import pySource from "./assemble.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const L = (en, id) => ({ en, id });
 const tok = rag.countTokens;
@@ -111,8 +113,10 @@ const text = {
     ],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Starve the answer", "Set the answer reserve to 0. The prompt fits more sources, but in a real model the answer would be cut off mid-sentence."] }, { exp: ["Lost in the middle", "With top-k 7 and order \"edges\", the best chunk is [1] and the second best is last. Lesson 18 measures why this helps."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Kurangi ruang jawaban", "Atur cadangan jawaban ke 0. Prompt memuat lebih banyak sumber, tetapi pada model sungguhan jawaban akan terpotong di tengah kalimat."] }, { exp: ["Hilang di tengah", "Dengan top-k 7 dan urutan \"tepi\", potongan terbaik menjadi [1] dan terbaik kedua di akhir. Pelajaran 18 mengukur mengapa ini membantu."] }],
+    en: [{ h: "Experiments" }, { exp: ["Starve the answer", "Set the answer reserve to 0. The prompt fits more sources, but in a real model the answer would be cut off mid-sentence."] }, { exp: ["Lost in the middle", "With top-k 7 and order \"edges\", the best chunk is [1] and the second best is last. Lesson 18 measures why this helps."] },
+      { exp: ["Reserve too little", "Set the answer reserve to 0 and the budget to 300. Everything seems to fit, but a real model would run out of room halfway through its answer and stop mid-sentence."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Kurangi ruang jawaban", "Atur cadangan jawaban ke 0. Prompt memuat lebih banyak sumber, tetapi pada model sungguhan jawaban akan terpotong di tengah kalimat."] }, { exp: ["Hilang di tengah", "Dengan top-k 7 dan urutan \"tepi\", potongan terbaik menjadi [1] dan terbaik kedua di akhir. Pelajaran 18 mengukur mengapa ini membantu."] },
+      { exp: ["Cadangan terlalu kecil", "Atur cadangan jawaban ke 0 dan anggaran ke 300. Semuanya tampak muat, tetapi model sungguhan akan kehabisan ruang di tengah jawaban dan berhenti di tengah kalimat."] }],
   },
   specs: {
     en: [{ dl: [["Budget", "The total tokens you allow per request: a cost and latency decision, not only the model's maximum."], ["Answer reserve", "Tokens kept free for the model's reply."], ["Order: score", "Best first."], ["Order: document", "Source reading order. Helps when chunks continue each other."], ["Order: edges", "Best at the start, second best at the end, weakest in the middle."]] }],
@@ -135,7 +139,32 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "How much does PLA printing cost?", id: "Berapa biaya cetak PLA?" },
   examples: { en: ["How much does PLA printing cost?", "What are the safety rules?", "How do I get after-hours access?"], id: ["Berapa biaya cetak PLA?", "Apa aturan keselamatannya?", "Bagaimana mendapat akses di luar jam buka?"] },
-  code: [{ id: "asm", label: L("Prompt assembly", "Penyusunan prompt"), source: pySource, runnable: false, filename: "assemble.py", note: L("Pair with lesson 6's retrieve(); then send the prompt to any LLM.", "Pasangkan dengan retrieve() pelajaran 6; lalu kirim prompt ke LLM mana pun.") }],
+  code: [
+    { id: "asm", label: L("Prompt assembly (runs here)", "Penyusunan prompt (bisa dijalankan)"), source: pySource, runnable: true, filename: "assemble.py" },
+    { id: "libs", label: L("With libraries", "Dengan pustaka"), source: libSource, runnable: false, filename: "assemble_libraries.py",
+      note: L("Runs on your computer after: pip install openai tiktoken. Plug in your own search().", "Jalankan di komputer Anda setelah: pip install openai tiktoken. Pasang search() Anda sendiri.") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang;
+    return {
+      prelude: prelude("rag"),
+      globals: { DOCUMENT: doc.text, QUESTION: I.question || "", TOP_K: I.topK, ORDER: I.order, BUDGET: I.budget, RESERVE: I.reserve, LANG: lang, STOPWORDS: stopList(lang) },
+      call: "demo(DOCUMENT, QUESTION, TOP_K, ORDER, BUDGET, RESERVE, LANG, STOPWORDS)",
+      compare: I.method === "neural" ? null : (res) => {
+        const stop = rag.stopwordsFor(lang), { sections, words } = rag.parseDocument(doc.text);
+        const chunks = rag.chunkDocument(words, 40, 8), e = rag.embedChunks(chunks, stop, lang);
+        const qt = rag.tokenize(I.question || "", stop, lang), qv = rag.vectorize(qt, e.idf), known = [...new Set(qt.filter((t) => e.idf.has(t)))];
+        const used = rag.retrieve(qv, e.vectors, I.topK).top.filter((t) => t.s >= 0.05 && known.length);
+        let room = I.budget - tok(rag.PROMPT_TEMPLATE[lang].system) - tok(I.question || "") - I.reserve;
+        const kept = [], dropped = [];
+        for (const t of orderTop(used, I.order)) { const cost = tok(chunks[t.i].text); if (cost <= room) { kept.push(t); room -= cost; } else dropped.push(t); }
+        const prompt = rag.buildPrompt(I.question || "", kept, chunks, sections, lang);
+        const ans = rag.extractAnswer(kept, chunks, known, e.idf, stop, lang);
+        return JSON.stringify(res.kept) === JSON.stringify(kept.map((t) => t.i)) && JSON.stringify(res.dropped) === JSON.stringify(dropped.map((t) => t.i))
+          && res.tokens === tok(prompt) && res.answer === ans.text;
+      },
+    };
+  },
   variables: (c) => [["order", c.ordered ? c.ordered.map((t) => t.i).join(", ") : "—"], ["kept", c.kept ? c.kept.map((t) => t.i).join(", ") : "—"], ["dropped", c.dropped ? c.dropped.map((t) => t.i).join(", ") || "[]" : "—"], ["prompt tokens", c.promptTokens ? String(c.promptTokens) : "—"]],
   challenges: [
     { id: "drop", text: L("Lower the budget until at least two chunks are dropped.", "Turunkan anggaran sampai paling sedikit dua potongan dibuang."), check: (c) => c.dropped && c.dropped.length >= 2 },

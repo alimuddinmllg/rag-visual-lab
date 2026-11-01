@@ -4,6 +4,8 @@ import * as rag from "../../rag/core.js";
 import { NUSABOT_EN, NUSABOT_ID } from "../../documents/nusabot.js";
 import { GENERAL_EN, GENERAL_ID } from "../../documents/general.js";
 import pySource from "./open_vs_closed.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const L = (en, id) => ({ en, id });
 const norm = (s) => " " + s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
@@ -137,10 +139,12 @@ const text = {
   experiments: {
     en: [{ h: "Experiments" },
       { exp: ["Try every question", "Closed book gets each one wrong, but in a different believable way: another price, another name, another time."] },
-      { exp: ["Lower the temperature", "At 0.1 the closed-book answer stops changing between tries, but it is still wrong. Being consistent is not the same as being correct."] }],
+      { exp: ["Lower the temperature", "At 0.1 the closed-book answer stops changing between tries, but it is still wrong. Being consistent is not the same as being correct."] },
+      { exp: ["Raise the temperature", "At 1.8 the closed-book model mixes words from many labs. Count the right answers over 30 tries: still zero, because the fact was never in its training text."] }],
     id: [{ h: "Eksperimen" },
       { exp: ["Coba semua pertanyaan", "Buku tertutup salah di setiap pertanyaan, dengan cara berbeda yang meyakinkan: harga lain, nama lain, jam lain."] },
-      { exp: ["Turunkan temperatur", "Pada 0,1 jawaban buku tertutup tidak lagi berubah antar percobaan, tetapi tetap salah. Konsisten tidak sama dengan benar."] }],
+      { exp: ["Turunkan temperatur", "Pada 0,1 jawaban buku tertutup tidak lagi berubah antar percobaan, tetapi tetap salah. Konsisten tidak sama dengan benar."] },
+      { exp: ["Naikkan temperatur", "Pada 1,8 model buku tertutup mencampur kata dari banyak lab. Hitung jawaban benar dari 30 percobaan: tetap nol, karena fakta itu tidak pernah ada di teks pelatihannya."] }],
   },
   specs: {
     en: [{ h: "What is simplified" }, { ul: ["The closed-book model is the tiny counting model from lesson 1, trained on a short fictional text about other labs.", "A real LLM is far more capable, but the core problem is the same: it cannot know facts that were never in its training data.", "\"Correct\" means the true fact appears in the answer text."] }],
@@ -151,12 +155,31 @@ const text = {
 export default {
   n: 2,
   stages, controls, text, Board,
-  code: [{ id: "cmp", label: L("Closed vs open book", "Buku tertutup vs terbuka"), source: pySource, runnable: false, filename: "open_vs_closed.py",
-    note: L("Combines the code from lessons 1 and 6; save those files next to this one to run it on your computer.", "Menggabungkan kode dari pelajaran 1 dan 6; simpan file-file itu di samping file ini untuk menjalankannya di komputer Anda.") }],
+  code: [
+    { id: "cmp", label: L("Closed vs open book (runs here)", "Buku tertutup vs terbuka (bisa dijalankan)"), source: pySource, runnable: true, filename: "open_vs_closed.py" },
+    { id: "libs", label: L("With libraries", "Dengan pustaka"), source: libSource, runnable: false, filename: "open_vs_closed_libraries.py",
+      note: L("Runs on your computer with a real LLM: pip install openai sentence-transformers, then start Ollama.", "Jalankan di komputer Anda dengan LLM sungguhan: pip install openai sentence-transformers, lalu jalankan Ollama.") },
+  ],
+  python: (c) => {
+    const lang = c.inputs.lang, qa = QA[lang][c.inputs.qi];
+    return {
+      prelude: prelude("tinyLm", "rag"),
+      globals: { HANDBOOK: lang === "id" ? NUSABOT_ID : NUSABOT_EN, GENERAL: lang === "id" ? GENERAL_ID : GENERAL_EN,
+        QUESTION: qa.q, STEM: qa.stem, EXPECT: qa.expect, LANG: lang, STOPWORDS: stopList(lang), TEMP: c.inputs.temperature, TRIES: c.inputs.tries },
+      call: "demo(HANDBOOK, GENERAL, QUESTION, STEM, EXPECT, LANG, STOPWORDS, TEMP, TRIES)",
+      compare: (res) => {
+        let right = 0;
+        for (let s = 1; s <= c.inputs.tries; s++) right += norm(closedAnswer(lang, qa.stem, c.inputs.temperature, s)).includes(" " + qa.expect + " ");
+        const open = rag.runPipeline({ document: lang === "id" ? NUSABOT_ID : NUSABOT_EN, question: qa.q, size: 40, overlap: 8, topK: 3, minSim: 0.1, lang });
+        return res.closed === closedAnswer(lang, qa.stem, c.inputs.temperature, 1) && res.closed_right === right && res.open === open.answer;
+      },
+    };
+  },
   variables: (c) => [["question", c.qa ? c.qa.q : "—"], ["closed answer", c.closed ? c.closed.text : "—"], ["closed correct", c.closedRight != null ? `${c.closedRight}/${c.inputs.tries}` : "—"], ["open answer", c.openOk != null ? c.open.answer : "—"]],
   challenges: [
     { id: "all", text: L("Run all four questions to the end. Does memory ever win?", "Jalankan keempat pertanyaan sampai selesai. Apakah ingatan pernah menang?"),
       check: (c) => { if (c.openOk != null) (window.__l2seen ||= new Set()).add(c.inputs.qi); return (window.__l2seen?.size || 0) >= 4; } },
+    { id: "hot", text: L("Set temperature to 1.8 or higher with 30 tries. Does randomness ever find the true fact?", "Atur temperatur 1,8 atau lebih dengan 30 percobaan. Apakah keacakan pernah menemukan fakta yang benar?"), check: (c) => c.inputs.temperature >= 1.79 && c.inputs.tries >= 30 && c.closedRight != null },
     { id: "cold", text: L("Set temperature to 0.1: the closed-book answer becomes consistent. Is it right now?", "Atur temperatur 0,1: jawaban buku tertutup menjadi konsisten. Apakah sekarang benar?"), check: (c) => c.inputs.temperature <= 0.11 && c.closedRight != null },
   ],
   quiz: [

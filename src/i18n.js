@@ -56,7 +56,7 @@ const STRINGS = {
     llmOff: "off", llmTitle: "Connect a real LLM (optional)", llmEnable: "Use my LLM for answers",
     llmHelp: "Any OpenAI-compatible endpoint works: Ollama or LM Studio on your computer, or a hosted service. Settings and key stay in this browser; requests go straight from your browser to that address.",
     llmUrl: "Base URL", llmModel: "Model", llmKey: "API key (leave empty for Ollama)",
-    llmOllama: "Ollama: start it with OLLAMA_ORIGINS=* so the browser may call it. Base URL http://localhost:11434/v1.",
+    llmOllama: "Ollama on your computer: Base URL http://localhost:11434/v1, API key empty. The browser can only reach it after the setup below.",
     llmTest: "Test connection", llmSave: "Save", llmAnswer: "Answer from your LLM, using the same prompt:",
   },
   id: {
@@ -113,7 +113,7 @@ const STRINGS = {
     llmOff: "mati", llmTitle: "Hubungkan LLM sungguhan (opsional)", llmEnable: "Gunakan LLM saya untuk jawaban",
     llmHelp: "Endpoint apa pun yang kompatibel dengan OpenAI bisa dipakai: Ollama atau LM Studio di komputer Anda, atau layanan daring. Pengaturan dan kunci tetap di browser ini; permintaan dikirim langsung dari browser Anda ke alamat itu.",
     llmUrl: "Base URL", llmModel: "Model", llmKey: "API key (kosongkan untuk Ollama)",
-    llmOllama: "Ollama: jalankan dengan OLLAMA_ORIGINS=* agar browser boleh memanggilnya. Base URL http://localhost:11434/v1.",
+    llmOllama: "Ollama di komputer Anda: Base URL http://localhost:11434/v1, API key kosong. Browser baru bisa menjangkaunya setelah pengaturan di bawah.",
     llmTest: "Uji koneksi", llmSave: "Simpan", llmAnswer: "Jawaban dari LLM Anda, dengan prompt yang sama:",
   },
 };

@@ -6,6 +6,8 @@ import RankLists from "../../toolkit/RankLists.jsx";
 import { BarList } from "../../toolkit/charts.jsx";
 import { NeuralStatus } from "../../toolkit/LessonParts.jsx";
 import pySource from "./fusion.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const PARA = { "nusabot-en": R.PARAPHRASES.en, "nusabot-id": R.PARAPHRASES.id };
 const evalSet = (doc) => { const ts = testSetFor(doc); return [...(ts ? ts.items : []), ...(PARA[doc.id] || [])]; };
@@ -66,8 +68,10 @@ const text = {
       { h: "Coba" }, { ol: ["Tekan **Putar** dan baca grafik batang dengan TF-IDF.", "Ganti ke **Neural** lalu jalankan lagi. Mana yang menang sekarang: BM25, neural, atau hibrida?"] }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Honest result", "With TF-IDF on the handbook the three bars are equal. That is a real finding: fusing two methods that make the same mistakes buys nothing."] }, { exp: ["k", "Small k (1–5) lets the very top of each list dominate; large k (60, the common default) blends deeper."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Hasil jujur", "Dengan TF-IDF di buku panduan, ketiga batang sama. Itu temuan nyata: menggabungkan dua metode yang membuat kesalahan sama tidak memberi apa-apa."] }, { exp: ["k", "k kecil (1–5) membuat puncak setiap daftar mendominasi; k besar (60, nilai bawaan umum) mencampur lebih dalam."] }],
+    en: [{ h: "Experiments" }, { exp: ["Honest result", "With TF-IDF on the handbook the three bars are equal. That is a real finding: fusing two methods that make the same mistakes buys nothing."] }, { exp: ["k", "Small k (1–5) lets the very top of each list dominate; large k (60, the common default) blends deeper."] },
+      { exp: ["Paraphrases", "Ask \"What is the price per gram for PLA?\". The handbook says \"cost\", not \"price\": BM25 and TF-IDF both lean on \"PLA\" and \"gram\". With the neural side on, the vector list changes and so does the fused list."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Hasil jujur", "Dengan TF-IDF di buku panduan, ketiga batang sama. Itu temuan nyata: menggabungkan dua metode yang membuat kesalahan sama tidak memberi apa-apa."] }, { exp: ["k", "k kecil (1–5) membuat puncak setiap daftar mendominasi; k besar (60, nilai bawaan umum) mencampur lebih dalam."] },
+      { exp: ["Parafrasa", "Tanyakan \"Berapa harga per gram untuk PLA?\". Buku panduan memakai \"biaya\", bukan \"harga\": BM25 dan TF-IDF sama-sama bergantung pada \"PLA\" dan \"gram\". Dengan sisi neural aktif, daftar vektor berubah dan begitu pula daftar gabungan."] }],
   },
   specs: {
     en: [{ dl: [["RRF", "score(chunk) = Σ over lists of 1 / (k + rank). Ranks start at 1."], ["Evaluation set", "The document's test set (built-in, or yours from lesson 19) plus 8 paraphrased questions for the handbook, which use words the handbook doesn't."], ["Alternatives", "Weighted score sums need the scores normalised first; RRF avoids that."]] }],
@@ -83,11 +87,36 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "What is the price per gram for PLA?", id: "Berapa harga per gram untuk PLA?" },
   examples: { en: ["What is the price per gram for PLA?", "KiCad", "Is the lab open at the weekend?"], id: ["Berapa harga per gram untuk PLA?", "KiCad", "Apakah lab buka akhir pekan?"] },
-  code: [{ id: "rrf", label: L("Reciprocal rank fusion", "Reciprocal rank fusion"), source: pySource, runnable: false, filename: "fusion.py", note: L("Imports lesson 13's bm25.py. Checked against the JavaScript by npm run golden.", "Mengimpor bm25.py pelajaran 13. Dicek terhadap JavaScript oleh npm run golden.") }],
+  code: [
+    { id: "rrf", label: L("Hybrid search (runs here)", "Pencarian hibrida (bisa dijalankan)"), source: pySource, runnable: true, filename: "fusion.py" },
+    { id: "libs", label: L("With LangChain", "Dengan LangChain"), source: libSource, runnable: false, filename: "hybrid_libraries.py",
+      note: L("Runs on your computer after: pip install langchain langchain-community langchain-huggingface rank-bm25 faiss-cpu", "Jalankan di komputer Anda setelah: pip install langchain langchain-community langchain-huggingface rank-bm25 faiss-cpu") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang, tests = evalSet(doc);
+    return {
+      prelude: prelude("rag", "bm25"),
+      globals: { DOCUMENT: doc.text, QUESTION: I.question || "", TESTS: tests, LANG: lang, STOPWORDS: stopList(lang), RRF_K: I.rrfK, K: I.k },
+      call: "demo(DOCUMENT, QUESTION, [tuple(t) for t in TESTS], LANG, STOPWORDS, RRF_K, K)",
+      compare: (res) => {
+        const idx = getIndex(doc, 40, 8), q = I.question || "", tf = (x) => R.rankBy(R.tfidfScores(idx, x));
+        const fused = R.rrf([bm25Rank(idx, q), tf(q)], I.rrfK).slice(0, 5).map((x) => x.i);
+        if (JSON.stringify(res.fused) !== JSON.stringify(fused)) return false;
+        if (!tests.length) return res.rates == null;
+        const sc = { bm25: 0, vector: 0, hybrid: 0 };
+        for (const [tq, e] of tests) {
+          const rel = R.relevantFor(idx.chunks, e), b = bm25Rank(idx, tq), v = tf(tq);
+          sc.bm25 += hitAt(b, rel, I.k); sc.vector += hitAt(v, rel, I.k); sc.hybrid += hitAt(R.rrf([b, v], I.rrfK), rel, I.k);
+        }
+        return Object.keys(sc).every((n) => Math.abs(res.rates[n] - sc[n] / tests.length) < 1e-9);
+      },
+    };
+  },
   variables: (c) => [["fused top", c.fused ? c.fused.slice(0, 5).map((x) => x.i).join(", ") : "—"], ["hit rates", c.evaluation ? `${pct(c.evaluation.bm)} / ${pct(c.evaluation.vec)} / ${pct(c.evaluation.hyb)}` : "—"]],
   challenges: [
     { id: "neuralEval", text: L("Evaluate hybrid search with the neural vector side.", "Evaluasi pencarian hibrida dengan sisi vektor neural."), check: (c) => c.vmethod === "neural" && c.evaluation },
     { id: "win", text: L("Find settings where hybrid scores at least as well as both BM25 and vector search, and better than one of them.", "Temukan pengaturan di mana hibrida setidaknya sama baik dengan BM25 dan vektor, dan lebih baik dari salah satunya."), check: (c) => c.evaluation && c.evaluation.hyb >= c.evaluation.bm && c.evaluation.hyb >= c.evaluation.vec && c.evaluation.hyb > Math.min(c.evaluation.bm, c.evaluation.vec) },
+    { id: "smallk", text: L("Set RRF k to 5 or less and see whether the fused #1 changes.", "Atur RRF k ke 5 atau kurang dan lihat apakah #1 gabungan berubah."), check: (c) => c.inputs.rrfK <= 5 && c.fused },
   ],
   quiz: [
     quizQ(L("Why does RRF use ranks instead of raw scores?", "Mengapa RRF memakai peringkat, bukan skor mentah?"), [L("BM25 and cosine scores live on different scales", "Skor BM25 dan cosine berada di skala berbeda"), L("Ranks are faster to compute", "Peringkat lebih cepat dihitung"), L("Scores are secret", "Skor dirahasiakan"), L("It doesn't", "Tidak benar")], 0, L("A BM25 score of 4 and a cosine of 0.4 can't be added meaningfully; positions can.", "Skor BM25 4 dan cosine 0,4 tidak bisa dijumlahkan secara bermakna; posisi bisa.")),

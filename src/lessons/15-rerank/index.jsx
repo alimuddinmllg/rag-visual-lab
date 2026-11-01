@@ -6,33 +6,11 @@ import { L, pct, getIndex, useNeuralForIndex, hitAt, sentencesOf, quizQ } from "
 import RankLists from "../../toolkit/RankLists.jsx";
 import { BarList } from "../../toolkit/charts.jsx";
 import { NeuralStatus } from "../../toolkit/LessonParts.jsx";
+import pySource from "./rerank.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const PARA = { "nusabot-en": R.PARAPHRASES.en, "nusabot-id": R.PARAPHRASES.id };
-const pySource = `# NalarNusa RAG Visual Lab · Lesson 15 · Re-ranking with a cross-encoder
-# pip install sentence-transformers
-from sentence_transformers import CrossEncoder
-
-# @stage first
-# candidates = top 10 chunks from a fast first stage (BM25, vectors or hybrid)
-# @end
-
-# @stage pairs
-reranker = CrossEncoder("cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")   # multilingual
-pairs = [(question, chunks[i]["text"]) for i, _ in candidates]
-# @end
-
-# @stage score
-scores = reranker.predict(pairs)          # reads question and chunk TOGETHER: slower, sharper
-# @end
-
-# @stage reorder
-reranked = [i for _, (i, _) in sorted(zip(scores, candidates), key=lambda x: -x[0])]
-# @end
-
-# @stage evaluate
-# compare hit@1 before and after on your test set (lesson 20) before keeping it
-# @end
-`;
 
 function rerank(idx, q, cands, neural, mode) {
   if (mode === "neural" && neural?.map?.has(q)) {
@@ -95,8 +73,10 @@ const text = {
       { p: "**Ukur sebelum dipakai.** Dengan pencocok berbasis kata di buku panduan ini, peningkatannya kecil atau bahkan negatif: ia melihat kata yang sama dengan tahap pertama. Re-ranker hanya membantu jika ia menangkap sesuatu yang dilewatkan tahap pertama." }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Big chunks", "Set chunk size to 120. Each chunk now mixes topics, and finding the one matching sentence matters more."] }, { exp: ["Neural re-ranker", "Switch the re-ranker to Neural and measure again on the paraphrased questions."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Potongan besar", "Atur ukuran potongan ke 120. Setiap potongan kini mencampur topik, sehingga menemukan satu kalimat yang cocok makin penting."] }, { exp: ["Re-ranker neural", "Ganti re-ranker ke Neural dan ukur lagi pada pertanyaan parafrasa."] }],
+    en: [{ h: "Experiments" }, { exp: ["Big chunks", "Set chunk size to 120. Each chunk now mixes topics, and finding the one matching sentence matters more."] }, { exp: ["Neural re-ranker", "Switch the re-ranker to Neural and measure again on the paraphrased questions."] },
+      { exp: ["Fewer candidates", "Set N to 3. The re-ranker can only reorder what the first stage found: if the right chunk is not in the top 3, no re-ranker can rescue it. Raise N and measure again."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Potongan besar", "Atur ukuran potongan ke 120. Setiap potongan kini mencampur topik, sehingga menemukan satu kalimat yang cocok makin penting."] }, { exp: ["Re-ranker neural", "Ganti re-ranker ke Neural dan ukur lagi pada pertanyaan parafrasa."] },
+      { exp: ["Kandidat lebih sedikit", "Atur N ke 3. Re-ranker hanya bisa mengurutkan ulang yang ditemukan tahap pertama: jika potongan yang benar tidak ada di top 3, re-ranker apa pun tidak bisa menyelamatkannya. Naikkan N dan ukur lagi."] }],
   },
   specs: {
     en: [{ dl: [["Candidates (N)", "How many first-stage results the re-ranker looks at. More = slower but more chances to rescue a good chunk."], ["Lexical re-ranker", "Best sentence by BM25-weighted word matches, favouring short focused sentences."], ["Neural re-ranker", "Best sentence by neural similarity. A true cross-encoder is stronger still; the Code tab shows one."]] }],
@@ -116,7 +96,28 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "Where do I charge a battery?", id: "Di mana saya bisa mengisi baterai?" },
   examples: { en: ["Where do I charge a battery?", "How much does PLA printing cost?", "When do they shut early?"], id: ["Di mana saya bisa mengisi baterai?", "Berapa biaya cetak PLA?", "Kapan lab tutup lebih cepat?"] },
-  code: [{ id: "ce", label: L("Cross-encoder re-ranking", "Re-ranking cross-encoder"), source: pySource, runnable: false, filename: "rerank.py", note: L("Runs on your computer after: pip install sentence-transformers", "Jalankan di komputer Anda setelah: pip install sentence-transformers") }],
+  code: [
+    { id: "rr", label: L("Word-level re-ranker (runs here)", "Re-ranker berbasis kata (bisa dijalankan)"), source: pySource, runnable: true, filename: "rerank.py" },
+    { id: "ce", label: L("Cross-encoder, with libraries", "Cross-encoder, dengan pustaka"), source: libSource, runnable: false, filename: "rerank_cross_encoder.py",
+      note: L("Runs on your computer after: pip install sentence-transformers", "Jalankan di komputer Anda setelah: pip install sentence-transformers") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang, ts = testSetFor(doc), tests = [...(ts ? ts.items : []), ...(PARA[doc.id] || [])];
+    return {
+      prelude: prelude("rag", "bm25"),
+      globals: { DOCUMENT: doc.text, QUESTION: I.question || "", TESTS: tests, LANG: lang, STOPWORDS: stopList(lang), N: I.n, SIZE: I.size },
+      call: "demo(DOCUMENT, QUESTION, [tuple(t) for t in TESTS], LANG, STOPWORDS, N, SIZE)",
+      compare: (res) => {
+        const idx = getIndex(doc, I.size, 0), q = I.question || "", first = (x) => R.rankBy(R.tfidfScores(idx, x)).slice(0, I.n);
+        const f = first(q), r = R.rerankBySentence(idx, q, f);
+        if (JSON.stringify(res.first) !== JSON.stringify(f.slice(0, 5).map((x) => x.i)) || JSON.stringify(res.reranked) !== JSON.stringify(r.slice(0, 5).map((x) => x.i))) return false;
+        if (!tests.length) return res.before == null;
+        let b = 0, a = 0;
+        for (const [tq, e] of tests) { const rel = R.relevantFor(idx.chunks, e), ff = first(tq); b += hitAt(ff, rel, 1); a += hitAt(R.rerankBySentence(idx, tq, ff), rel, 1); }
+        return Math.abs(res.before - b / tests.length) < 1e-9 && Math.abs(res.after - a / tests.length) < 1e-9;
+      },
+    };
+  },
   variables: (c) => [["first", c.first ? c.first.map((x) => x.i).join(", ") : "—"], ["reranked", c.reranked ? c.reranked.map((x) => x.i).join(", ") : "—"]],
   challenges: [
     { id: "measure", text: L("Measure the lexical re-ranker. Did it help?", "Ukur re-ranker leksikal. Apakah membantu?"), check: (c) => c.mode === "lexical" && c.evaluation },

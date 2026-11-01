@@ -2,6 +2,7 @@
 import * as bpe from "../../rag/bpe.js";
 import { BarList } from "../../toolkit/charts.jsx";
 import pySource from "./bpe.py?raw";
+import libSource from "./with_libraries.py?raw";
 
 const L = (en, id) => ({ en, id });
 const cache = new Map();
@@ -102,10 +103,12 @@ const text = {
   experiments: {
     en: [{ h: "Experiments" },
       { exp: ["Language matters", "Train on the English handbook and tokenize \"Mahasiswa meminjam osiloskop\". Then switch to the Indonesian handbook. The same sentence needs far fewer tokens, because the tokenizer learned Indonesian pieces. Real models trained mostly on English also spend more tokens (and money) on Indonesian."] },
-      { exp: ["Rare words", "Type a name or code like \"QRIS-2026\". Rare strings stay in small pieces at any merge count."] }],
+      { exp: ["Rare words", "Type a name or code like \"QRIS-2026\". Rare strings stay in small pieces at any merge count."] },
+      { exp: ["Shrink the window", "Set the context window to 128 tokens and step to Fit the window. Only a small slice of the handbook fits: this is why RAG sends a few relevant chunks instead of the whole file."] }],
     id: [{ h: "Eksperimen" },
       { exp: ["Bahasa berpengaruh", "Latih dengan buku panduan Indonesia lalu tokenisasi \"Members may borrow equipment\". Lalu ganti ke buku panduan Inggris. Kalimat yang sama butuh jauh lebih sedikit token, karena tokenizer mempelajari potongan bahasa Inggris. Model sungguhan yang sebagian besar dilatih dengan bahasa Inggris juga memakai lebih banyak token (dan biaya) untuk bahasa Indonesia."] },
-      { exp: ["Kata langka", "Ketik nama atau kode seperti \"QRIS-2026\". String langka tetap terpecah kecil berapa pun jumlah gabungannya."] }],
+      { exp: ["Kata langka", "Ketik nama atau kode seperti \"QRIS-2026\". String langka tetap terpecah kecil berapa pun jumlah gabungannya."] },
+      { exp: ["Perkecil jendela", "Atur jendela konteks ke 128 token lalu jalankan sampai Muat ke jendela. Hanya sebagian kecil buku panduan yang muat: inilah alasan RAG mengirim beberapa potongan relevan, bukan seluruh file."] }],
   },
   specs: {
     en: [{ dl: [["Merges learned", "How many merge rules BPE learns from the document. Real tokenizers learn 30,000 to 200,000."], ["Context window", "Real models range from about 8,000 to over 1,000,000 tokens. Bigger windows cost more and models still pay less attention to the middle (lesson 18)."], ["·", "Marks the end of a word, so \"the\" at the end of a word differs from \"the\" inside \"there\"."]] }],
@@ -121,7 +124,8 @@ export default {
   runLabel: L("Tokenize", "Tokenisasi"),
   defaultQuestion: { en: "How much does PLA printing cost at the lab?", id: "Berapa biaya cetak PLA di lab?" },
   examples: { en: ["How much does PLA printing cost at the lab?", "Mahasiswa meminjam osiloskop", "QRIS-2026 microcontroller"], id: ["Berapa biaya cetak PLA di lab?", "Members may borrow equipment", "QRIS-2026 mikrokontroler"] },
-  code: [{ id: "bpe", label: L("BPE tokenizer (runs here)", "Tokenizer BPE (bisa dijalankan)"), source: pySource, runnable: true, filename: "bpe.py" }],
+  code: [{ id: "bpe", label: L("BPE tokenizer (runs here)", "Tokenizer BPE (bisa dijalankan)"), source: pySource, runnable: true, filename: "bpe.py" },
+    { id: "libs", label: L("With libraries", "Dengan pustaka"), source: libSource, runnable: false, filename: "tokens_libraries.py", note: L("Runs on your computer after: pip install tiktoken tokenizers", "Jalankan di komputer Anda setelah: pip install tiktoken tokenizers") }],
   variables: (c) => [["len(merges)", c.merges ? String(c.merges.length) : "—"], ["tokens", c.tokens ? `[${c.tokens.map((t) => `'${t}'`).join(", ")}]` : "—"], ["doc tokens", c.docTokens != null ? String(c.docTokens) : "—"], ["window", String(c.inputs.window)]],
   python: (c) => ({
     globals: { DOCUMENT: c.inputs.doc.text, TEXT: c.inputs.question || "", MERGES: c.inputs.merges, WINDOW: c.inputs.window },

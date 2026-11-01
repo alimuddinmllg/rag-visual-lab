@@ -44,3 +44,9 @@ export async function runPython(source, globals, call) {
     ns.destroy();
   }
 }
+
+// Files from earlier lessons are loaded first in the browser ("prelude"), so a lesson's
+// imports of those local files are removed before it runs. Handles "from x import (a,\n b)".
+const LOCAL = "(?:rag_from_scratch|tiny_lm|bm25|fusion|metrics|rewrite|chunkers)";
+export const stripLocalImports = (src) =>
+  src.replace(new RegExp(`^from ${LOCAL} import \\([^)]*\\).*$`, "gm"), "").replace(new RegExp(`^from ${LOCAL} import .*$`, "gm"), "");

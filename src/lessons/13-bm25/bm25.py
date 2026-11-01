@@ -50,4 +50,19 @@ def vector_scores(chunks, question, stop, lang):
 # @stage compare
 def rank(scores):
     return sorted(range(len(scores)), key=lambda i: (-scores[i], i))
+
+
+def demo(document, question, lang, stop, k1=1.2, b=0.75):
+    stop = set(stop)
+    chunks, toks = index(document, lang, stop)
+    q_tokens = tokenize(question, stop, lang)
+    bm = bm25_scores(toks, q_tokens, k1, b)
+    vec = vector_scores(chunks, question, stop, lang)
+    rb, rv = rank(bm), rank(vec)
+    print("query words:", q_tokens)
+    print("BM25  :", ", ".join(f"#{i + 1} {bm[i]:.2f}" for i in rb[:5]))
+    print("vector:", ", ".join(f"#{i + 1} {vec[i]:.2f}" for i in rv[:5]))
+    shared = len(set(rb[:5]) & set(rv[:5]))
+    print(f"shared in top 5: {shared}/5   same #1: {rb[0] == rv[0]}")
+    return {"bm25": rb[:5], "vector": rv[:5]}
 # @end

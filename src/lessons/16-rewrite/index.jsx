@@ -8,6 +8,9 @@ import { useEffect, useState } from "react";
 import { L, pct, getIndex, hitAt, quizQ } from "../shared.js";
 import RankLists from "../../toolkit/RankLists.jsx";
 import { BarList } from "../../toolkit/charts.jsx";
+import pySource from "./rewrite.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const lmCache = {};
 const tinyLM = (lang) => (lmCache[lang] ||= ng.trainLM(ng.lmTokens(lang === "id" ? GENERAL_ID : GENERAL_EN)));
@@ -96,8 +99,10 @@ const text = {
       { p: "Di sini tabel sinonim dan model mini dari pelajaran 2 menggantikan LLM. Hubungkan LLM sungguhan (tombol di header) dan HyDE akan memakainya." }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Words the handbook doesn't use", "Try \"What is the fee to join as a student?\" and \"When do they shut early?\"."] }, { exp: ["Read the fake answer", "HyDE's fake answer is often wrong (another lab's price) yet it retrieves the right chunk, because it uses the right kind of words."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Kata yang tidak dipakai buku panduan", "Coba \"Berapa ongkos daftar anggota mahasiswa?\" dan \"Kapan lab tutup lebih cepat?\"."] }, { exp: ["Baca jawaban palsunya", "Jawaban palsu HyDE sering salah (harga lab lain) tetapi tetap mengambil potongan yang benar, karena memakai jenis kata yang tepat."] }],
+    en: [{ h: "Experiments" }, { exp: ["Words the handbook doesn't use", "Try \"What is the fee to join as a student?\" and \"When do they shut early?\"."] }, { exp: ["Read the fake answer", "HyDE's fake answer is often wrong (another lab's price) yet it retrieves the right chunk, because it uses the right kind of words."] },
+      { exp: ["No synonyms", "Ask \"KiCad\". The table has no entry, so multi-query has only one version and gives exactly the original ranking. Rewriting only helps when users and documents use different words."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Kata yang tidak dipakai buku panduan", "Coba \"Berapa ongkos daftar anggota mahasiswa?\" dan \"Kapan lab tutup lebih cepat?\"."] }, { exp: ["Baca jawaban palsunya", "Jawaban palsu HyDE sering salah (harga lab lain) tetapi tetap mengambil potongan yang benar, karena memakai jenis kata yang tepat."] },
+      { exp: ["Tanpa sinonim", "Tanyakan \"KiCad\". Tabel tidak punya entri untuk itu, sehingga multi-kueri hanya punya satu versi dan memberi peringkat yang persis sama dengan aslinya. Penulisan ulang hanya membantu jika pengguna dan dokumen memakai kata yang berbeda."] }],
   },
   specs: {
     en: [{ dl: [["Synonym table", "Maps everyday words (price, fee, shut, weekend…) to the handbook's words. An LLM does this more broadly."], ["HyDE", "Gao et al., 2022. The fake answer is never shown to the user; it is only a search query."], ["Cost", "Each extra query is another search, and an LLM rewrite adds latency before retrieval even starts."]] }],
@@ -105,26 +110,6 @@ const text = {
   },
 };
 
-const pySource = `# NalarNusa RAG Visual Lab · Lesson 16 · Query rewriting, multi-query, HyDE
-# @stage original
-ranking = search(question)
-# @end
-
-# @stage multi
-variants = llm(f"Rewrite this question 3 ways using formal handbook wording, one per line:\\n{question}").splitlines()
-rankings = [search(v) for v in [question] + variants]
-fused = rrf(rankings)                     # lesson 14
-# @end
-
-# @stage hyde
-fake_answer = llm(f"Write a short passage that answers: {question}")   # facts may be wrong; only used to search
-ranking = search(fake_answer)
-# @end
-
-# @stage evaluate
-# compare hit@k of all three on questions phrased the way your users talk
-# @end
-`;
 
 export default {
   n: 16, stages, text, Board,
@@ -133,11 +118,33 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "What is the fee to join as a student?", id: "Berapa ongkos daftar anggota mahasiswa?" },
   examples: { en: ["What is the fee to join as a student?", "When do they shut early?", "Is the lab open at the weekend?", "Where do I charge a battery?"], id: ["Berapa ongkos daftar anggota mahasiswa?", "Kapan lab tutup lebih cepat?", "Apakah lab buka akhir pekan?", "Di mana saya bisa mengisi baterai?"] },
-  code: [{ id: "rw", label: L("Rewriting with an LLM", "Penulisan ulang dengan LLM"), source: pySource, runnable: false, filename: "rewrite.py", note: L("Pseudocode: plug in your search() from lesson 6 and any llm() call.", "Pseudokode: pasang search() dari pelajaran 6 dan panggilan llm() apa pun.") }],
+  code: [
+    { id: "rw", label: L("Rewriting, multi-query, HyDE (runs here)", "Tulis ulang, multi-kueri, HyDE (bisa dijalankan)"), source: pySource, runnable: true, filename: "rewrite.py" },
+    { id: "libs", label: L("With a real LLM", "Dengan LLM sungguhan"), source: libSource, runnable: false, filename: "rewrite_llm.py",
+      note: L("Runs on your computer after: pip install openai sentence-transformers, with Ollama or any OpenAI-compatible server.", "Jalankan di komputer Anda setelah: pip install openai sentence-transformers, dengan Ollama atau server lain yang kompatibel dengan OpenAI.") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang, para = PARA[doc.id] || [];
+    return {
+      prelude: prelude("tinyLm", "rag", "bm25", "fusion"),
+      globals: { DOCUMENT: doc.text, GENERAL: lang === "id" ? GENERAL_ID : GENERAL_EN, QUESTION: I.question || "", PARA: para, LANG: lang, STOPWORDS: stopList(lang), K: I.k },
+      call: "demo(DOCUMENT, GENERAL, QUESTION, [tuple(t) for t in PARA], LANG, STOPWORDS, K)",
+      compare: (res) => {
+        const idx = getIndex(doc, 40, 8), q = I.question || "", srch = (x) => R.rankBy(R.tfidfScores(idx, x)), multi = (x) => R.rrf(R.rewriteQuery(x, lang).map(srch));
+        const ids = (r) => JSON.stringify(r.slice(0, 3).map((x) => x.i));
+        if (JSON.stringify(res.orig) !== ids(srch(q)) || JSON.stringify(res.multi) !== ids(multi(q)) || JSON.stringify(res.hyde) !== ids(srch(hydeTiny(q, lang)))) return false;
+        if (!para.length) return res.rates == null;
+        const s = { original: 0, multi: 0, hyde: 0 };
+        for (const [pq, e] of para) { const rel = R.relevantFor(idx.chunks, e); s.original += hitAt(srch(pq), rel, I.k); s.multi += hitAt(multi(pq), rel, I.k); s.hyde += hitAt(srch(hydeTiny(pq, lang)), rel, I.k); }
+        return Object.keys(s).every((n) => Math.abs(res.rates[n] - s[n] / para.length) < 1e-9);
+      },
+    };
+  },
   variables: (c) => [["variants", c.variants ? c.variants.length : "—"], ["fake answer", c.fake ? c.fake.slice(0, 80) + "…" : "—"]],
   challenges: [
     { id: "rescue", text: L("Find a question where multi-query gets a different #1 than the original.", "Temukan pertanyaan di mana multi-kueri mendapat #1 yang berbeda dari kueri asli."), check: (c) => c.multi && c.multi[0].i !== c.orig[0].i },
     { id: "measure", text: L("Measure all three on the paraphrased questions.", "Ukur ketiganya pada pertanyaan parafrasa."), check: (c) => !!c.evaluation },
+    { id: "same", text: L("Ask a question with no synonyms in the table, so multi-query has only one version.", "Ajukan pertanyaan tanpa sinonim di tabel, sehingga multi-kueri hanya punya satu versi."), check: (c) => c.variants && c.variants.length === 1 && (c.inputs.question || "").length > 2 },
   ],
   quiz: [
     quizQ(L("What does HyDE search with?", "HyDE mencari dengan apa?"), [L("A fake answer written by a model", "Jawaban palsu yang ditulis model"), L("The user's question only", "Hanya pertanyaan pengguna"), L("A random chunk", "Potongan acak"), L("The previous answer", "Jawaban sebelumnya")], 0, L("The fake answer is written in document style, so it lands near real answers.", "Jawaban palsu ditulis dengan gaya dokumen, sehingga mendarat dekat jawaban asli.")),

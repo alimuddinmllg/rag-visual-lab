@@ -289,3 +289,7 @@ fieldset.qz legend{font-weight:600;font-size:13.5px;padding:0 4px}
 .chip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:3px 10px;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .chip[aria-pressed="true"]{border-color:var(--ink);background:var(--grid);font-weight:600}
+/* touch targets ≥ 24px (WCAG 2.2) */
+input[type="range"]{height:28px}
+input[type="checkbox"],input[type="radio"]{width:20px;height:20px;accent-color:var(--accent)}
+.btn{min-height:30px}

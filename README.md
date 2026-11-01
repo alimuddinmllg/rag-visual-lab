@@ -9,9 +9,14 @@ Learn retrieval-augmented generation (RAG) by watching it run, changing it, and 
   Opt-in per lesson (lessons 4, 6, 10, 12); ~120 MB downloaded once from Hugging Face, then cached by the browser.
 - **Challenges and quizzes** in every lesson; progress is saved in the browser and lessons get a ✓ when complete.
 - **Optional real LLM** (header button): any OpenAI-compatible endpoint, e.g. Ollama on your own computer
-  (`OLLAMA_ORIGINS=* ollama serve`, base URL `http://localhost:11434/v1`). Used in lessons 6, 16, 18, 19, 21, 24.
+  (base URL `http://localhost:11434/v1`; the LLM panel has step-by-step setup for Windows, macOS and Linux,
+  allowing only the lab's own address). Used in lessons 6, 16, 18, 19, 21, 24.
   Settings and key stay in the browser; requests go straight from the browser to that endpoint.
 - **Your own test sets** (lesson 19), saved per document and used by lessons 14–23.
+- **Code in every lesson, two ways**: a from-scratch Python file that runs in the browser (Pyodide) and is checked
+  against the visual, and a "with libraries" file (sentence-transformers, LangChain, LlamaIndex, Chroma, FAISS,
+  rank_bm25, ranx, an OpenAI-compatible client) to run on your own computer.
+- **Every lesson** has at least 3 experiments, 3 challenges and 3 quiz questions, in both languages.
 
 | Level | Lessons |
 | --- | --- |
@@ -30,7 +35,8 @@ Gates still open: the Phase 1 class pilot (pre/post quiz) and the Phase 2 public
 | `npm run dev` | Development server at http://localhost:5173 |
 | `npm run build` | Static site in `dist/` |
 | `npm run preview` | Serve the built site at http://localhost:4173 |
-| `npm run golden` | Check that the Python in the Code tabs gives the same numbers as the visuals (38 cases) |
+| `npm run golden` | Check that the Python in the Code tabs gives the same numbers as the visuals (38 cases + all 24 lessons in both languages) |
+| `npm run pylessons` | Only the second part: run every lesson's Python with its default settings and compare with the lesson |
 
 `npm run golden` needs Python 3 with numpy (`pip install numpy`). It finds `python3`, `python` or `py` automatically.
 
@@ -69,8 +75,11 @@ src/
       content.js              lesson text in EN + ID
       rag_from_scratch.py     the Python shown in the Code tab (twin of rag/core.js)
       rag_with_libraries.py   the same pipeline with sentence-transformers + Ollama (read-only)
+    NN-name/with_libraries.py every lesson: the same idea with common libraries (read-only)
+    prelude.js                earlier lessons' Python, loaded before a lesson's own file in the browser
 python/check_golden.py        golden test, Python side
 scripts/golden.mjs            golden test, JavaScript side
+scripts/python-lessons.mjs    runs every lesson's Python file through the lesson's own compare()
 ```
 
 ### The lesson contract
@@ -87,7 +96,7 @@ A lesson is a plain object (see any folder in `src/lessons/`):
 | `useExtra(inputs)` | Optional React hook returning a **memoised** object merged into inputs (used for neural vectors) |
 | `Board`, `DataPanel?` | React components that draw `ctx` (use toolkit components) |
 | `code` | `[{ id, label, source, runnable, note? }]`. Mark stages in the source with `# @stage <id>` … `# @end` |
-| `variables(ctx)`, `python(ctx)` | Live values panel; `{ globals, call, compare? }` for "Run this Python in your browser" |
+| `variables(ctx)`, `python(ctx)` | Live values panel; `{ prelude?, globals, call, compare? }` for "Run this Python in your browser". `prelude` = earlier lessons' files (`prelude("rag", "bm25")` from `lessons/prelude.js`); their `from x import …` lines are removed before running. `compare` returns true/false, or is `null` for output only |
 | `challenges` | `[{ id, text, check(ctx) }]`, ticked automatically when `check` passes |
 | `quiz` | `[{ q, options, answer, why }]`, 80% to pass |
 | `text`, `examples`, `defaultQuestion`, `questionLabel`, `runLabel` | Lesson content, all `{ en, id }` |
@@ -96,15 +105,18 @@ A lesson is a plain object (see any folder in `src/lessons/`):
 
 1. Copy `src/lessons/06-rag-pipeline/` to `src/lessons/NN-name/`.
 2. Write its stages and text; reuse toolkit components for the board where possible.
-3. Write the Python twin with `# @stage` markers, and add cases to `scripts/golden.mjs`.
+3. Write the Python twin with `# @stage` markers and a `demo(...)` function, add `python(ctx)` with a `compare`,
+   and add a `with_libraries.py`. `npm run pylessons NN` checks it.
 4. Register it in `src/lessons/index.js`. It lights up in the menu automatically.
 
 ### Rule: visual and code never drift
 
 Where a lesson's Python is a twin of its JavaScript, `npm run golden` checks they agree (38 cases):
 the RAG pipeline (`rag/core.js` ↔ lesson 6), the n-gram language model (`rag/ngram.js` ↔ lesson 1),
-BPE (`rag/bpe.js` ↔ lesson 3), the vector index (`rag/ann.js` ↔ lesson 11), and BPE ranking, RRF and the
-retrieval metrics (`rag/retrieval.js` ↔ lessons 13, 14, 20) on all 20 built-in test questions. Run it before every deploy.
+BPE (`rag/bpe.js` ↔ lesson 3), the vector index (`rag/ann.js` ↔ lesson 11), and BM25 ranking, RRF and the
+retrieval metrics (`rag/retrieval.js` ↔ lessons 13, 14, 20) on all 20 built-in test questions.
+It then runs the from-scratch Python of all 24 lessons in both languages through each lesson's own `compare()`
+(48 runs). Run it before every deploy.
 
 ### Honest findings built into the lessons
 
@@ -116,9 +128,10 @@ In the app, "Run this Python in your browser" does the same check live for the l
 
 ## Known limits
 
-- Lessons 2, 4, 8–10, 12–24 show read-only Python (it imports lesson 6's file, needs extra packages, or is pseudocode).
+- The "with libraries" files are read-only in the browser: they need packages or a model server on your computer.
+- The from-scratch Python of lessons 16, 18, 19, 21 and 24 covers the simulated parts; the real-LLM parts are in their "with libraries" files.
 - Lesson 24's vulnerable model is simulated; connect a real LLM to test a real one.
-- Calling an LLM from the browser needs the endpoint to allow it (CORS). Ollama: set OLLAMA_ORIGINS.
+- Calling an LLM from the browser needs the endpoint to allow it (CORS) and, in Chrome, the local-network permission. See the LLM panel.
 - Lesson 9 uses the built-in handbook's test set; own documents need their own test set (lesson 19, Phase 2).
 - Indonesian has no stemmer: "biayanya" does not match "biaya" with TF-IDF. Neural embeddings handle it.
 - Monitor and live-value lines stay in technical English in both languages.

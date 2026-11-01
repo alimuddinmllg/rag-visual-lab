@@ -1,59 +1,68 @@
 # NalarNusa RAG Visual Lab · Lesson 4 · Sentences as points in space
-# Two ways to turn text into vectors: TF-IDF (shared words) and a neural model (meaning).
-# pip install sentence-transformers numpy   (for the neural part)
+# TF-IDF vectors from lesson 6 (shared words). The neural version is in the "With libraries" tab.
 import re
-import numpy as np
+from rag_from_scratch import embed_chunks, tokenize, vectorize, cosine, pca_2d   # lesson 6
 
 
 # @stage split
 def split_sentences(document, limit=80):
-    sentences = []
+    """Every sentence with at least 3 words becomes one point; remember its section."""
+    out, sec, seen = [], 0, 0
     for line in document.split("\n"):
-        if line.strip() and not line.startswith("## "):
-            sentences += [s for s in re.split(r"(?<=[.!?])\s+", line.strip()) if len(s.split()) >= 3]
-    return sentences[:limit]
+        t = line.strip()
+        if not t:
+            continue
+        if t.startswith("## "):
+            sec, seen = seen, seen + 1
+            continue
+        for s in re.split(r"(?<=[.!?])\s+", t):
+            if len(s.split()) >= 3:
+                out.append({"text": s, "sec": max(0, sec)})
+    return out[:limit]
 # @end
 
 
 # @stage vectorize
-def tfidf_vectors(texts):
-    """Each text becomes a vector with one number per word in the vocabulary."""
-    docs = [re.findall(r"[a-z0-9]+", t.lower()) for t in texts]
-    vocab = sorted({w for d in docs for w in d})
-    idf = {w: np.log((len(docs) + 1) / (sum(w in d for d in docs) + 1)) + 1 for w in vocab}
-    X = np.array([[d.count(w) * idf[w] for w in vocab] for d in docs], dtype=float)
-    return X / (np.linalg.norm(X, axis=1, keepdims=True) + 1e-12)
-
-
-def neural_vectors(texts):
-    """Each text becomes 384 numbers that capture meaning, in 50+ languages."""
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-    return model.encode(texts, normalize_embeddings=True)
+def sentence_vectors(sentences, stop, lang):
+    """One TF-IDF vector per sentence: one dimension per word in the vocabulary."""
+    idf, vocab, vectors = embed_chunks(sentences, stop, lang)
+    return idf, vocab, vectors
 # @end
 
 
 # @stage map
-def to_2d(X):
-    """PCA: the two directions along which the points spread out the most."""
-    Xc = X - X.mean(axis=0)
-    _, _, vt = np.linalg.svd(Xc, full_matrices=False)
-    return Xc @ vt[:2].T
+def to_2d(vectors, vocab):
+    """PCA: keep the two directions along which the points spread out the most."""
+    coords, mean, axes, _ = pca_2d(vectors, vocab)
+    return coords
 # @end
 
 
 # @stage neighbours
-def nearest(X, probe_vec, k=3):
-    scores = X @ probe_vec                  # cosine similarity (rows have length 1)
-    order = np.argsort(-scores)[:k]
-    return [(int(i), float(scores[i])) for i in order]
+def nearest(probe, sentences, idf, vectors, stop, lang, k=3):
+    qv = vectorize(tokenize(probe, stop, lang), idf)
+    scores = [cosine(qv, v) if qv else 0.0 for v in vectors]
+    order = sorted(range(len(scores)), key=lambda i: -scores[i])[:k]
+    return [(i, scores[i]) for i in order]
+
+
+def demo(document, probe, lang, stop, k=3):
+    stop = set(stop)
+    sentences = split_sentences(document)
+    idf, vocab, vectors = sentence_vectors(sentences, stop, lang)
+    coords = to_2d(vectors, vocab)
+    print(f"{len(sentences)} sentences -> {len(vocab)} dimensions -> 2D map")
+    top = nearest(probe, sentences, idf, vectors, stop, lang, k)
+    for i, s in top:
+        print(f"#{i + 1}  {s:.2f}  {sentences[i]['text']}")
+    if not top or top[0][1] == 0:
+        print("No shared words: TF-IDF cannot place this sentence. Try the neural model.")
+    return {"top": [[i, s] for i, s in top], "n": len(sentences)}
 # @end
 
 
 if __name__ == "__main__":
-    doc = open("handbook.txt", encoding="utf-8").read()
-    sents = split_sentences(doc)
-    probe = "How much does it cost to print something?"
-    X = neural_vectors(sents + [probe])
-    for i, s in nearest(X[:-1], X[-1]):
-        print(f"{s:.2f}  {sents[i]}")
+    import json
+    doc = open("nusabot_handbook.txt", encoding="utf-8").read()
+    stop = json.load(open("stopwords.json", encoding="utf-8"))["en"]
+    demo(doc, "What is the price of printing?", "en", stop)

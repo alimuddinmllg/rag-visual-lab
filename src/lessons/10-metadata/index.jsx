@@ -4,6 +4,9 @@ import DocumentSpace, { SECTION_COLORS } from "../../toolkit/DocumentSpace.jsx";
 import { ChunkList, AnswerPanel } from "../../toolkit/TextPanels.jsx";
 import { NeuralStatus } from "../../toolkit/LessonParts.jsx";
 import pySource from "./filtering.py?raw";
+import libSource from "./with_libraries.py?raw";
+import * as rag from "../../rag/core.js";
+import { prelude, stopList } from "../prelude.js";
 
 const L = (en, id) => ({ en, id });
 const KINDS = { price: L("a price", "harga"), time: L("a time", "jam"), rule: L("a rule", "aturan") };
@@ -106,8 +109,10 @@ const text = {
     ],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Filter too hard", "Ask about safety but filter to the Membership section. Nothing relevant is left: the answer becomes \"I don't know\". A wrong filter is worse than none."] }, { exp: ["Uploaded PDFs", "For an uploaded PDF, sections are pages. Filtering by page is how real systems answer \"according to page 3…\"."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Filter terlalu ketat", "Tanyakan soal keselamatan tetapi saring ke bagian Keanggotaan. Tidak ada yang relevan tersisa: jawabannya menjadi \"tidak tahu\". Filter yang salah lebih buruk daripada tanpa filter."] }, { exp: ["PDF yang diunggah", "Untuk PDF yang diunggah, bagian adalah halaman. Menyaring per halaman adalah cara sistem sungguhan menjawab \"menurut halaman 3…\"."] }],
+    en: [{ h: "Experiments" }, { exp: ["Filter too hard", "Ask about safety but filter to the Membership section. Nothing relevant is left: the answer becomes \"I don't know\". A wrong filter is worse than none."] }, { exp: ["Uploaded PDFs", "For an uploaded PDF, sections are pages. Filtering by page is how real systems answer \"according to page 3…\"."] },
+      { exp: ["Filter plus search", "Ask \"When does it close?\" with the kind filter set to a time. Every candidate now has a time in it, so similarity only has to choose which time. Then remove the filter and compare the top three."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Filter terlalu ketat", "Tanyakan soal keselamatan tetapi saring ke bagian Keanggotaan. Tidak ada yang relevan tersisa: jawabannya menjadi \"tidak tahu\". Filter yang salah lebih buruk daripada tanpa filter."] }, { exp: ["PDF yang diunggah", "Untuk PDF yang diunggah, bagian adalah halaman. Menyaring per halaman adalah cara sistem sungguhan menjawab \"menurut halaman 3…\"."] },
+      { exp: ["Filter ditambah pencarian", "Tanyakan \"Kapan lab tutup?\" dengan filter jenis diatur ke jam. Semua kandidat kini berisi jam, sehingga kemiripan hanya perlu memilih jam yang mana. Lalu hapus filter dan bandingkan tiga teratas."] }],
   },
   specs: {
     en: [{ dl: [["Section", "Taken from the document's headings (or PDF pages)."], ["Mentions", "Detected with simple patterns: \"Rp\" + number = price; 09:00-style = time; must/never/required = rule. Real systems store metadata from the source system (author, date, access rights) or extract it with a model."], ["Pre-filtering", "Filter, then search. Vector databases support this natively with metadata fields."]] }],
@@ -131,7 +136,30 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "How much does it cost?", id: "Berapa biaya yang harus dibayar?" },
   examples: { en: ["How much does it cost?", "What are the rules?", "When does it close?"], id: ["Berapa biaya yang harus dibayar?", "Apa aturan keselamatan?", "Kapan lab tutup?"] },
-  code: [{ id: "filter", label: L("Metadata filter", "Filter metadata"), source: pySource, runnable: false, filename: "filtering.py", note: L("Imports from lesson 6's rag_from_scratch.py.", "Mengimpor dari rag_from_scratch.py pelajaran 6.") }],
+  code: [
+    { id: "filter", label: L("Metadata filter (runs here)", "Filter metadata (bisa dijalankan)"), source: pySource, runnable: true, filename: "filtering.py" },
+    { id: "libs", label: L("With a vector database", "Dengan database vektor"), source: libSource, runnable: false, filename: "filtering_chroma.py",
+      note: L("Runs on your computer after: pip install chromadb sentence-transformers", "Jalankan di komputer Anda setelah: pip install chromadb sentence-transformers") },
+  ],
+  python: (c) => {
+    const doc = c.inputs.doc, lang = doc.lang, I = c.inputs;
+    const sec = I.fSection === "all" ? null : +I.fSection, kind = I.fKind === "all" ? null : I.fKind;
+    return {
+      prelude: prelude("rag"),
+      globals: { DOCUMENT: doc.text, QUESTION: I.question || "", SIZE: I.size, OVERLAP: I.overlap, TOP_K: I.topK, MIN_SIM: I.minSim, LANG: lang, STOPWORDS: stopList(lang), SECTION: sec, KIND: kind },
+      call: "demo(DOCUMENT, QUESTION, SIZE, OVERLAP, TOP_K, MIN_SIM, LANG, STOPWORDS, SECTION, KIND)",
+      compare: I.method === "neural" ? null : (res) => {
+        const stop = rag.stopwordsFor(lang), { words } = rag.parseDocument(doc.text);
+        const chunks = rag.chunkDocument(words, I.size, I.overlap), e = rag.embedChunks(chunks, stop, lang);
+        const qt = rag.tokenize(I.question || "", stop, lang), qv = rag.vectorize(qt, e.idf), known = [...new Set(qt.filter((t) => e.idf.has(t)))];
+        const ok = (i) => (sec === null || chunks[i].sec === sec) && (kind === null || tagChunk(chunks[i].text).includes(kind));
+        const top = e.vectors.map((v, i) => ({ i, s: qv.size ? rag.cosine(qv, v) : 0 })).filter((t) => ok(t.i)).sort((a, b) => b.s - a.s).slice(0, I.topK);
+        const used = top.filter((t) => t.s >= I.minSim && known.length);
+        const ans = rag.extractAnswer(used, chunks, known, e.idf, stop, lang);
+        return res.top.length === top.length && res.top.every(([i, s], k) => i === top[k].i && Math.abs(s - top[k].s) < 1e-9) && res.answer === ans.text;
+      },
+    };
+  },
   variables: (c) => [["filter", `section=${c.inputs.fSection}, kind=${c.inputs.fKind}`], ["len(candidates)", c.allowed ? String(c.allowed.size) : "—"], ["top", c.top ? c.top.map((t) => `(${t.i}, ${t.s.toFixed(2)})`).join(", ") : "—"]],
   challenges: [
     { id: "sec", text: L("Ask \"How much does it cost?\" and use a section filter to get the 3D printing price as the answer.", "Tanyakan \"Berapa biaya yang harus dibayar?\" dan pakai filter bagian agar jawabannya biaya cetak 3D."), check: (c) => c.inputs.fSection !== "all" && c.answer?.grounded && /PLA|filament|filamen/i.test(c.answer.text) },

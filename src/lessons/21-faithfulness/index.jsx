@@ -6,6 +6,9 @@ import * as ng from "../../rag/ngram.js";
 import { GENERAL_EN, GENERAL_ID } from "../../documents/general.js";
 import { useLLMAnswer } from "../../rag/llm.js";
 import { L, pct, getIndex, quizQ } from "../shared.js";
+import pySource from "./faithfulness.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 const lm = {};
 const closedBook = (q, lang) => { const m = (lm[lang] ||= ng.trainLM(ng.lmTokens(lang === "id" ? GENERAL_ID : GENERAL_EN))); const seed = ng.lmTokens(q).filter((t) => /[a-z]/.test(t)).slice(-2); return ng.detok([...seed, ...ng.generate(m, seed, 16, 0.8, 3).map((g) => g.w)]).replace(/^./, (c) => c.toUpperCase()); };
@@ -92,8 +95,10 @@ const text = {
       { p: "Di sini dukungan dicek dengan kecocokan kata dan pemeriksaan angka. Alat produksi (seperti RAGAS) meminta LLM menilai setiap klaim; idenya sama." }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["The mixed answer", "Choose \"Mixed\": the first claim is green, the invented one red. Readers would trust the whole answer."] }, { exp: ["Threshold", "Lower the threshold to 0.3 and a made-up claim may pass on shared words alone. The numbers check still catches wrong prices."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Jawaban campuran", "Pilih \"Campuran\": klaim pertama hijau, klaim karangan merah. Pembaca akan memercayai seluruh jawaban."] }, { exp: ["Ambang", "Turunkan ambang ke 0,3 dan klaim karangan bisa lolos hanya karena berbagi kata. Pemeriksaan angka tetap menangkap harga yang salah."] }],
+    en: [{ h: "Experiments" }, { exp: ["The mixed answer", "Choose \"Mixed\": the first claim is green, the invented one red. Readers would trust the whole answer."] }, { exp: ["Threshold", "Lower the threshold to 0.3 and a made-up claim may pass on shared words alone. The numbers check still catches wrong prices."] },
+      { exp: ["Raise the bar", "Choose \"Extractive\", raise the threshold to 1.0 and ask \"When is the lab open on Saturday?\". The answer is copied from the handbook, yet a claim fails: it was cut at a chunk edge, so no single source sentence covers all its words. A threshold that is too strict marks honest answers as unfaithful."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Jawaban campuran", "Pilih \"Campuran\": klaim pertama hijau, klaim karangan merah. Pembaca akan memercayai seluruh jawaban."] }, { exp: ["Ambang", "Turunkan ambang ke 0,3 dan klaim karangan bisa lolos hanya karena berbagi kata. Pemeriksaan angka tetap menangkap harga yang salah."] },
+      { exp: ["Naikkan standar", "Pilih \"Ekstraktif\", naikkan ambang ke 1,0, lalu coba beberapa pertanyaan. Jawabannya disalin dari buku panduan, tetapi klaim yang terpotong di batas potongan bisa gagal karena tidak ada satu kalimat sumber yang mencakup semua katanya. Ambang yang terlalu ketat menilai jawaban jujur sebagai tidak setia."] }],
   },
   specs: {
     en: [{ dl: [["Support ratio", "Share of the claim's content words found in its best-matching source sentence."], ["Numbers check", "Every number in the claim must appear somewhere in the sources."], ["Relevance", "TF-IDF cosine between question and answer. An answer can be faithful but off-topic, or on-topic but unfaithful."]] }],
@@ -101,32 +106,6 @@ const text = {
   },
 };
 
-const pySource = `# NalarNusa RAG Visual Lab · Lesson 21 · Faithfulness, claim by claim
-# @stage retrieve
-sources = [chunks[i]["text"] for i, _ in retrieve(question)[:3]]
-# @end
-
-# @stage answer
-answer = generate(question, sources)        # any generator, including an LLM
-# @end
-
-# @stage claims
-claims = [s for s in re.split(r"(?<=[.!?])\\s+", answer) if len(s.split()) >= 3]
-# @end
-
-# @stage check
-def supported(claim, sources, threshold=0.6):
-    words = set(tokenize(claim))
-    best = max(len(words & set(tokenize(s))) / max(1, len(words))
-               for src in sources for s in re.split(r"(?<=[.!?])\\s+", src))
-    numbers_ok = all(n in " ".join(sources) for n in re.findall(r"[0-9][0-9.,:]*", claim))
-    return best >= threshold and numbers_ok
-# @end
-
-# @stage score
-faithfulness = sum(supported(c, sources) for c in claims) / len(claims)
-# @end
-`;
 
 export default {
   n: 21, stages, text, Board, useExtra,
@@ -137,7 +116,25 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "How much does PLA printing cost?", id: "Berapa biaya cetak PLA?" },
   examples: { en: ["How much does PLA printing cost?", "How many items can members borrow?", "When is the lab open on Saturday?"], id: ["Berapa biaya cetak PLA?", "Berapa alat yang boleh dipinjam?", "Kapan lab buka hari Sabtu?"] },
-  code: [{ id: "f", label: L("Faithfulness", "Kesetiaan"), source: pySource, runnable: false, filename: "faithfulness.py", note: L("Pseudocode around lesson 6's functions.", "Pseudokode di sekitar fungsi pelajaran 6.") }],
+  code: [
+    { id: "f", label: L("Faithfulness (runs here)", "Kesetiaan (bisa dijalankan)"), source: pySource, runnable: true, filename: "faithfulness.py" },
+    { id: "libs", label: L("With an LLM judge", "Dengan juri LLM"), source: libSource, runnable: false, filename: "faithfulness_llm_judge.py",
+      note: L("Runs on your computer after: pip install openai. ragas and deepeval package the same idea.", "Jalankan di komputer Anda setelah: pip install openai. ragas dan deepeval mengemas ide yang sama.") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang, llm = I.llmAns?.status === "ready" ? I.llmAns.text : null;
+    return {
+      prelude: prelude("tinyLm", "rag", "bm25"),
+      globals: { DOCUMENT: doc.text, GENERAL: lang === "id" ? GENERAL_ID : GENERAL_EN, QUESTION: I.question || "", SOURCE: I.source, THRESHOLD: I.threshold, LANG: lang, STOPWORDS: stopList(lang), LLM_ANSWER: llm },
+      call: "demo(DOCUMENT, GENERAL, QUESTION, SOURCE, THRESHOLD, LANG, STOPWORDS, LLM_ANSWER)",
+      compare: I.source === "llm" && !llm ? null : (res) => {
+        let ctx = { inputs: I };
+        for (const st of stages) ctx = { ...ctx, ...st.run(ctx) };
+        return res.answer === ctx.answer && JSON.stringify(res.supported) === JSON.stringify(ctx.checks.map((x) => x.supported))
+          && Math.abs(res.faith - ctx.faith) < 1e-9 && Math.abs(res.relevance - ctx.relevance) < 1e-9;
+      },
+    };
+  },
   variables: (c) => [["claims", c.claims ? String(c.claims.length) : "—"], ["faithfulness", c.faith != null ? pct(c.faith) : "—"]],
   challenges: [
     { id: "catch", text: L("Catch an invented claim (a red card).", "Tangkap klaim karangan (kartu merah)."), check: (c) => c.checks?.some((x) => !x.supported) },
@@ -147,5 +144,6 @@ export default {
   quiz: [
     quizQ(L("Faithfulness measures…", "Kesetiaan (faithfulness) mengukur…"), [L("whether each claim is supported by the retrieved sources", "apakah setiap klaim didukung sumber yang diambil"), L("whether the answer is long", "apakah jawabannya panjang"), L("retrieval speed", "kecepatan retrieval"), L("the model's confidence", "keyakinan model")], 0, L("It ties the answer back to evidence.", "Ini mengikat jawaban ke bukti.")),
     quizQ(L("Why is a mostly-right answer with one invented claim dangerous?", "Mengapa jawaban yang sebagian besar benar dengan satu klaim karangan berbahaya?"), [L("Readers trust the whole answer because most of it checks out", "Pembaca memercayai seluruh jawaban karena sebagian besar terbukti benar"), L("It is too long", "Terlalu panjang"), L("It costs more tokens", "Lebih banyak token"), L("It isn't", "Tidak berbahaya")], 0, L("That's why claims are checked one by one.", "Karena itu klaim diperiksa satu per satu.")),
+    quizQ(L("A claim shares most of its words with a source sentence, but says \"Rp 3.000\" where the source says \"Rp 2.000\". What should the check do?", "Sebuah klaim berbagi sebagian besar kata dengan kalimat sumber, tetapi menyebut \"Rp 3.000\" padahal sumbernya \"Rp 2.000\". Apa yang harus dilakukan pemeriksaan?"), [L("Mark it unsupported: every number must appear in the sources", "Tandai tidak didukung: setiap angka harus ada di sumber"), L("Mark it supported: most words match", "Tandai didukung: sebagian besar kata cocok"), L("Ignore numbers", "Abaikan angka"), L("Round the numbers", "Bulatkan angkanya")], 0, L("Word overlap alone misses the most harmful errors: a wrong price, time or amount. That is why numbers get their own check.", "Kecocokan kata saja melewatkan kesalahan paling berbahaya: harga, jam, atau jumlah yang salah. Karena itu angka diperiksa tersendiri.")),
   ],
 };

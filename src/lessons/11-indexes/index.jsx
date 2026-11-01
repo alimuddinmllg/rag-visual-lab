@@ -1,6 +1,7 @@
 // Lesson 11: vector indexes. Brute force compares with everything; a graph index walks to the answer.
 import * as ann from "../../rag/ann.js";
 import pySource from "./ann.py?raw";
+import libSource from "./with_libraries.py?raw";
 
 const L = (en, id) => ({ en, id });
 const K = 5;
@@ -87,8 +88,10 @@ const text = {
     ],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Break it", "M = 2, ef = 1, and move the query to the far corner. The search can get stuck in the wrong cluster: recall drops below 100%."] }, { exp: ["Fix it", "Raise ef: the search keeps more candidates and recovers, at the cost of more comparisons. This dial exists in every real vector database."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Rusak", "M = 2, ef = 1, lalu pindahkan kueri ke pojok jauh. Pencarian bisa terjebak di kelompok yang salah: recall turun di bawah 100%."] }, { exp: ["Perbaiki", "Naikkan ef: pencarian menyimpan lebih banyak kandidat dan pulih, dengan biaya lebih banyak perbandingan. Pengatur ini ada di setiap vector database sungguhan."] }],
+    en: [{ h: "Experiments" }, { exp: ["Break it", "M = 2, ef = 1, and move the query to the far corner. The search can get stuck in the wrong cluster: recall drops below 100%."] }, { exp: ["Fix it", "Raise ef: the search keeps more candidates and recovers, at the cost of more comparisons. This dial exists in every real vector database."] },
+      { exp: ["More links, bigger index", "Raise M from 4 to 12 and watch the build step: many more lines. Recall rarely misses now, but every extra link is memory. Real indexes pick M between 8 and 64."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Rusak", "M = 2, ef = 1, lalu pindahkan kueri ke pojok jauh. Pencarian bisa terjebak di kelompok yang salah: recall turun di bawah 100%."] }, { exp: ["Perbaiki", "Naikkan ef: pencarian menyimpan lebih banyak kandidat dan pulih, dengan biaya lebih banyak perbandingan. Pengatur ini ada di setiap vector database sungguhan."] },
+      { exp: ["Tautan lebih banyak, indeks lebih besar", "Naikkan M dari 4 ke 12 dan lihat langkah Bangun graf: garisnya jauh lebih banyak. Recall jarang meleset sekarang, tetapi setiap tautan tambahan memakan memori. Indeks sungguhan memakai M antara 8 dan 64."] }],
   },
   specs: {
     en: [{ dl: [["Links per vector (M)", "How many neighbours each vector is linked to when inserted. More links: better recall, more memory."], ["ef", "How many candidates the search keeps while walking. Higher: better recall, slower."], ["HNSW", "Adds layers: a sparse top layer for long jumps and denser layers below. Used by FAISS, pgvector, Qdrant, Weaviate, Milvus and others."], ["When to skip the index", "Below about 10,000 chunks, brute force is fast enough and always exact."]] }],
@@ -107,7 +110,8 @@ export default {
     { id: "qx", label: L("Query X", "Kueri X"), min: 0, max: 1, step: 0.02, default: 0.3, format: (v) => v.toFixed(2) },
     { id: "qy", label: L("Query Y", "Kueri Y"), min: 0, max: 1, step: 0.02, default: 0.7, format: (v) => v.toFixed(2) },
   ],
-  code: [{ id: "ann", label: L("Brute force vs graph (runs here)", "Brute force vs graf (bisa dijalankan)"), source: pySource, runnable: true, filename: "ann.py" }],
+  code: [{ id: "ann", label: L("Brute force vs graph (runs here)", "Brute force vs graf (bisa dijalankan)"), source: pySource, runnable: true, filename: "ann.py" },
+    { id: "libs", label: L("With FAISS", "Dengan FAISS"), source: libSource, runnable: false, filename: "ann_faiss.py", note: L("Runs on your computer after: pip install faiss-cpu numpy", "Jalankan di komputer Anda setelah: pip install faiss-cpu numpy") }],
   variables: (c) => [["exact", c.exact ? JSON.stringify(c.exact.top) : "—"], ["found", c.found ? JSON.stringify(c.found.top) : "—"], ["comparisons", c.found ? `${c.found.comparisons} vs ${c.exact.comparisons}` : "—"]],
   python: (c) => ({
     globals: { N: c.inputs.n, SEED: c.inputs.seed, M: c.inputs.M, EF: c.inputs.ef, QX: c.inputs.qx, QY: c.inputs.qy },
@@ -121,6 +125,7 @@ export default {
   challenges: [
     { id: "miss", text: L("Make the graph search miss: recall below 100%.", "Buat pencarian graf meleset: recall di bawah 100%."), check: (c) => c.recall != null && c.recall < 1 },
     { id: "fast", text: L("With 1,000 vectors, get 100% recall using at least 10× fewer comparisons than brute force.", "Dengan 1.000 vektor, dapatkan recall 100% dengan perbandingan paling sedikit 10× lebih sedikit dari brute force."), check: (c) => c.inputs.n >= 1000 && c.recall === 1 && c.speedup >= 10 },
+    { id: "fix", text: L("With M = 2, raise ef until recall@5 is 100% again.", "Dengan M = 2, naikkan ef sampai recall@5 kembali 100%."), check: (c) => c.inputs.M === 2 && c.recall === 1 && c.inputs.ef > 1 },
   ],
   quiz: [
     { q: L("Why do large RAG systems use an approximate index like HNSW?", "Mengapa sistem RAG besar memakai indeks perkiraan seperti HNSW?"),

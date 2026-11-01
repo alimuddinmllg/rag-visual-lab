@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { loadUserSets, saveUserSet } from "../../rag/testsets.js";
 import { chat, llmReady, useLLM } from "../../rag/llm.js";
 import { L, quizQ } from "../shared.js";
+import pySource from "./test_set.py?raw";
+import libSource from "./with_libraries.py?raw";
 
 const FACT = /(Rp\s?[0-9][0-9.,]*(?:\s+per\s+\w+)?|\b[0-9]{1,2}[:.][0-9]{2}\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s+\w+|\b[0-9]+(?:[.,][0-9]+)?\s*(?:%|days?|hours?|weeks?|pages?|credits?|hari|jam|minggu|halaman|sks)\b)/i;
 
@@ -80,8 +82,10 @@ const text = {
       { p: "Pelajaran ini membuat draf pertanyaan dari fakta di dokumen Anda (harga, jam, jumlah). Draf memakai kata-kata dokumen, sehingga terlalu mudah: **tulis ulang**, manual atau dengan LLM Anda, lalu simpan. Pelajaran 14, 15, 17, 18, 20, dan 23 akan memakai set Anda." }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Your own document", "Upload a document (Try it yourself), build and save a set, then open lesson 20 with the same document."] }, { exp: ["Easy vs real questions", "Save the drafts as they are, check lesson 20's scores, then reword them and check again. The drop is how much the drafts flattered you."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Dokumen Anda sendiri", "Unggah dokumen (Coba sendiri), buat dan simpan set, lalu buka pelajaran 20 dengan dokumen yang sama."] }, { exp: ["Pertanyaan mudah vs nyata", "Simpan draf apa adanya, cek skor di pelajaran 20, lalu ubah kata-katanya dan cek lagi. Penurunannya menunjukkan seberapa besar draf membuat skor tampak bagus."] }],
+    en: [{ h: "Experiments" }, { exp: ["Your own document", "Upload a document (Try it yourself), build and save a set, then open lesson 20 with the same document."] }, { exp: ["Easy vs real questions", "Save the drafts as they are, check lesson 20's scores, then reword them and check again. The drop is how much the drafts flattered you."] },
+      { exp: ["Facts the scanner misses", "Upload a document whose facts are names, places or dates (\"15 March\"). The patterns find few drafts. Those questions must be written by hand, and they are often the ones users ask most."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Dokumen Anda sendiri", "Unggah dokumen (Coba sendiri), buat dan simpan set, lalu buka pelajaran 20 dengan dokumen yang sama."] }, { exp: ["Pertanyaan mudah vs nyata", "Simpan draf apa adanya, cek skor di pelajaran 20, lalu ubah kata-katanya dan cek lagi. Penurunannya menunjukkan seberapa besar draf membuat skor tampak bagus."] },
+      { exp: ["Fakta yang terlewat", "Unggah dokumen yang faktanya berupa nama, tempat, atau tanggal (\"15 Maret\"). Polanya hanya menemukan sedikit draf. Pertanyaan seperti itu harus ditulis manual, dan justru sering paling banyak ditanyakan pengguna."] }],
   },
   specs: {
     en: [{ dl: [["Fact patterns", "Rp prices, times like 09:00, number words + noun (\"three items\"), numbers with units (days, hours, pages, %)."], ["Storage", "Saved per document in this browser. Copy as JSON to keep a file or share it."], ["Size", "20–50 questions is a good start; more for documents with many topics."]] }],
@@ -89,37 +93,33 @@ const text = {
   },
 };
 
-const pySource = `# NalarNusa RAG Visual Lab · Lesson 19 · A test set as plain data
-# @stage facts
-FACT = re.compile(r"(Rp\\s?[0-9][0-9.,]*(?:\\s+per\\s+\\w+)?|\\b[0-9]{1,2}[:.][0-9]{2}\\b)")
-facts = [(s, FACT.search(s).group(0)) for s in sentences if FACT.search(s)]
-# @end
-
-# @stage draft
-drafts = [{"question": s.replace(f, "___"), "expected": f} for s, f in facts]
-# @end
-
-# @stage review
-# rewrite each question as a real user would ask it, add some unanswerable ones
-# @end
-
-# @stage save
-json.dump(drafts, open("test_set.json", "w"), ensure_ascii=False, indent=2)
-# @end
-`;
 
 export default {
   n: 19, stages, text, Board,
   controls: [{ id: "max", label: L("Max questions", "Maks. pertanyaan"), min: 5, max: 40, step: 5, default: 15 }],
   inputs: { document: true },
-  code: [{ id: "ts", label: L("Test set file", "File set uji"), source: pySource, runnable: false, filename: "test_set.py", note: L("A test set is just data: keep it in version control next to your code.", "Set uji hanyalah data: simpan di version control di samping kode Anda.") }],
+  code: [
+    { id: "ts", label: L("Draft a test set (runs here)", "Buat draf set uji (bisa dijalankan)"), source: pySource, runnable: true, filename: "test_set.py" },
+    { id: "libs", label: L("Reword with an LLM", "Ubah kata dengan LLM"), source: libSource, runnable: false, filename: "test_set_llm.py",
+      note: L("Runs on your computer after: pip install openai. A test set is just data: keep it in version control next to your code.", "Jalankan di komputer Anda setelah: pip install openai. Set uji hanyalah data: simpan di version control di samping kode Anda.") },
+  ],
+  python: (c) => ({
+    globals: { TEXT: c.inputs.doc.text, LANG: c.inputs.doc.lang, MAX: c.inputs.max },
+    call: "demo(TEXT, LANG, MAX)",
+    compare: (res) => {
+      const js = findFacts(c.inputs.doc.text).slice(0, c.inputs.max).map((f) => [draftQuestion(f, c.inputs.doc.lang), f.fact]);
+      return JSON.stringify(res.drafts) === JSON.stringify(js);
+    },
+  }),
   variables: (c) => [["facts", c.facts ? String(c.facts.length) : "—"]],
   challenges: [
     { id: "own", text: L("Save a test set for a document you uploaded.", "Simpan set uji untuk dokumen yang Anda unggah."), check: (c) => c.inputs.doc.user && (loadUserSets()[c.inputs.doc.id]?.length || 0) > 0 },
     { id: "reword", text: L("Save a set where every question is reworded (no \"___\" left).", "Simpan set di mana setiap pertanyaan sudah diubah (tidak ada \"___\" tersisa)."), check: (c) => { const s = loadUserSets()[c.inputs.doc.id]; return !!s?.length && s.every((x) => !x[0].includes("___")); } },
+    { id: "ten", text: L("Save a set of at least 10 questions for the document you are using.", "Simpan set berisi paling sedikit 10 pertanyaan untuk dokumen yang sedang Anda pakai."), check: (c) => (loadUserSets()[c.inputs.doc.id]?.length || 0) >= 10 },
   ],
   quiz: [
     quizQ(L("Why are questions copied from the document a weak test?", "Mengapa pertanyaan yang disalin dari dokumen adalah uji yang lemah?"), [L("They share exact words with the answer, so retrieval looks better than it is", "Kata-katanya sama persis dengan jawaban, sehingga retrieval tampak lebih baik dari kenyataan"), L("They are too long", "Terlalu panjang"), L("They contain numbers", "Berisi angka"), L("They are fine", "Tidak masalah")], 0, L("Real users paraphrase; your test must too.", "Pengguna sungguhan memparafrasa; uji Anda juga harus begitu.")),
     quizQ(L("What else belongs in a test set besides answerable questions?", "Apa lagi yang perlu ada di set uji selain pertanyaan yang bisa dijawab?"), [L("Questions the document can't answer", "Pertanyaan yang tidak bisa dijawab dokumen"), L("The model's API key", "API key model"), L("The chunk size", "Ukuran potongan"), L("Nothing", "Tidak ada")], 0, L("Without them you can't measure whether the system knows when to say \"I don't know\".", "Tanpanya Anda tidak bisa mengukur apakah sistem tahu kapan harus menjawab \"tidak tahu\".")),
+    quizQ(L("The expected phrase is \"Rp 2.000 per gram\" and the system answers \"Rp2000/gram\". What does a phrase-match check report?", "Frasa yang diharapkan \"Rp 2.000 per gram\" dan sistem menjawab \"Rp2000/gram\". Apa hasil pemeriksaan pencocokan frasa?"), [L("Wrong: the words differ, so keep expected phrases short and check odd misses by hand", "Salah: kata-katanya berbeda, jadi buat frasa yang diharapkan pendek dan periksa manual kegagalan yang janggal"), L("Correct: the numbers are the same", "Benar: angkanya sama"), L("It depends on the temperature", "Tergantung temperatur"), L("The check skips numbers", "Pemeriksaan melewati angka")], 0, L("Phrase matching is strict and cheap. It can mark a right answer wrong, so read a sample of failures yourself.", "Pencocokan frasa itu ketat dan murah. Ia bisa menilai jawaban benar sebagai salah, jadi baca sendiri sebagian kegagalannya.")),
   ],
 };

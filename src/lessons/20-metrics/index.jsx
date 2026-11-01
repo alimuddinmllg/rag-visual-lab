@@ -4,6 +4,8 @@ import { testSetFor } from "../../rag/testsets.js";
 import { L, pct, getIndex, bm25Rank, quizQ } from "../shared.js";
 import { BarList } from "../../toolkit/charts.jsx";
 import pySource from "./metrics.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 function rank(idx, q, how) {
   const v = R.rankBy(R.tfidfScores(idx, q));
@@ -63,8 +65,10 @@ const text = {
       { p: "Ganti retriever, k, atau ukuran potongan dan lihat angka mana yang bergerak. Memakai set uji bawaan, atau milik Anda dari pelajaran 19." }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Raise k", "Recall goes up; precision goes down. That trade-off is why you can't optimise one number."] }, { exp: ["Retrievers", "Compare TF-IDF, BM25 and hybrid on MRR. Small differences on 10 questions are noise; you need more questions to trust them."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Naikkan k", "Recall naik; presisi turun. Karena itu Anda tidak bisa mengoptimalkan satu angka saja."] }, { exp: ["Retriever", "Bandingkan TF-IDF, BM25, dan hibrida pada MRR. Selisih kecil pada 10 pertanyaan hanyalah kebetulan; Anda butuh lebih banyak pertanyaan untuk mempercayainya."] }],
+    en: [{ h: "Experiments" }, { exp: ["Raise k", "Recall goes up; precision goes down. That trade-off is why you can't optimise one number."] }, { exp: ["Retrievers", "Compare TF-IDF, BM25 and hybrid on MRR. Small differences on 10 questions are noise; you need more questions to trust them."] },
+      { exp: ["Chunk size moves every metric", "Change the chunk size from 40 to 15. Recall drops for every retriever (on the English handbook from 0.95 to 0.60), yet every answer phrase still sits whole in some chunk: small overlapping chunks repeat each answer in several chunks, and the top 3 cannot hold them all. A metric measures the whole pipeline in front of it, chunking included."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Naikkan k", "Recall naik; presisi turun. Karena itu Anda tidak bisa mengoptimalkan satu angka saja."] }, { exp: ["Retriever", "Bandingkan TF-IDF, BM25, dan hibrida pada MRR. Selisih kecil pada 10 pertanyaan hanyalah kebetulan; Anda butuh lebih banyak pertanyaan untuk mempercayainya."] },
+      { exp: ["Ukuran potongan menggeser semua metrik", "Ubah ukuran potongan dari 40 ke 15. Recall turun untuk semua retriever (pada buku panduan Indonesia dari 1,00 ke 0,80), padahal setiap frasa jawaban masih utuh di salah satu potongan: potongan kecil yang tumpang tindih mengulang setiap jawaban di beberapa potongan, dan top 3 tidak bisa memuat semuanya. Metrik mengukur seluruh pipeline di depannya, termasuk chunking."] }],
   },
   specs: {
     en: [{ dl: [["Relevant chunk", "One that contains the expected phrase (case and punctuation ignored)."], ["nDCG", "DCG = Σ rel / log2(rank + 1); divided by the best possible DCG. Binary relevance here."], ["Checked", "These formulas are checked against the Python in the Code tab by npm run golden."]] }],
@@ -80,7 +84,24 @@ export default {
     { id: "size", label: L("Chunk size", "Ukuran potongan"), min: 15, max: 120, step: 5, default: 40 },
   ],
   inputs: { document: true },
-  code: [{ id: "m", label: L("Metrics", "Metrik"), source: pySource, runnable: false, filename: "metrics.py", note: L("Checked against the JavaScript by npm run golden.", "Dicek terhadap JavaScript oleh npm run golden.") }],
+  code: [
+    { id: "m", label: L("Metrics (runs here)", "Metrik (bisa dijalankan)"), source: pySource, runnable: true, filename: "metrics.py" },
+    { id: "libs", label: L("With ranx", "Dengan ranx"), source: libSource, runnable: false, filename: "metrics_ranx.py",
+      note: L("Runs on your computer after: pip install ranx", "Jalankan di komputer Anda setelah: pip install ranx") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang, ts = testSetFor(doc), tests = ts ? ts.items : [];
+    return {
+      prelude: prelude("rag", "bm25", "fusion"),
+      globals: { DOCUMENT: doc.text, TESTS: tests, RETRIEVER: I.retriever, K: I.k, SIZE: I.size, LANG: lang, STOPWORDS: stopList(lang) },
+      call: "demo(DOCUMENT, [tuple(t) for t in TESTS], RETRIEVER, K, SIZE, LANG, STOPWORDS)",
+      compare: (res) => {
+        const idx = getIndex(doc, I.size, 8);
+        const per = tests.map(([q, e]) => R.metricsAt(rank(idx, q, I.retriever), R.relevantFor(idx.chunks, e), I.k));
+        return ["recall", "precision", "rr", "ndcg"].every((m) => Math.abs(res[m] - R.mean(per.map((p) => p[m]))) < 1e-9);
+      },
+    };
+  },
   variables: (c) => [["MRR", c.mrr != null ? c.mrr.toFixed(3) : "—"], ["nDCG", c.ndcg != null ? c.ndcg.toFixed(3) : "—"]],
   challenges: [
     { id: "tradeoff", text: L("Raise k to 8 and note what happens to precision.", "Naikkan k ke 8 dan perhatikan apa yang terjadi pada presisi."), check: (c) => c.inputs.k >= 8 && c.per },

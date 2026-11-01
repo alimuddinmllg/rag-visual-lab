@@ -2,6 +2,7 @@
 import * as ng from "../../rag/ngram.js";
 import { BarList } from "../../toolkit/charts.jsx";
 import pySource from "./ngram.py?raw";
+import libSource from "./with_libraries.py?raw";
 
 const L = (en, id) => ({ en, id });
 
@@ -153,7 +154,8 @@ export default {
   defaultQuestion: { en: "PLA prints cost", id: "Cetak PLA dikenakan biaya" },
   examples: { en: ["PLA prints cost", "The lab coordinator is", "Members may borrow", "Wear safety"], id: ["Cetak PLA dikenakan biaya", "Koordinator lab", "Anggota boleh meminjam", "Gunakan kacamata"] },
   Board,
-  code: [{ id: "ngram", label: L("Tiny language model (runs here)", "Model bahasa mini (bisa dijalankan)"), source: pySource, runnable: true, filename: "tiny_lm.py" }],
+  code: [{ id: "ngram", label: L("Tiny language model (runs here)", "Model bahasa mini (bisa dijalankan)"), source: pySource, runnable: true, filename: "tiny_lm.py" },
+    { id: "libs", label: L("Real LLM, with libraries", "LLM sungguhan, dengan pustaka"), source: libSource, runnable: false, filename: "next_token_libraries.py", note: L("Runs on your computer after: pip install torch transformers (downloads a 0.5B model, about 1 GB).", "Jalankan di komputer Anda setelah: pip install torch transformers (mengunduh model 0,5B, sekitar 1 GB).") }],
   variables: (c) => [
     ["len(doc_tokens)", c.docTokens ? String(c.docTokens.length) : "—"],
     ["prompt_tokens", c.promptTokens ? `[${c.promptTokens.map((w) => `'${w}'`).join(", ")}]` : "—"],

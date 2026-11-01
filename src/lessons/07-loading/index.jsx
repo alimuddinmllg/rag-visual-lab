@@ -1,6 +1,7 @@
 // Lesson 7: loading documents. What PDF extraction gives you, and how to clean it.
 import * as cl from "../../rag/cleaning.js";
 import pySource from "./clean.py?raw";
+import libSource from "./with_libraries.py?raw";
 
 const L = (en, id) => ({ en, id });
 
@@ -78,10 +79,12 @@ const text = {
   experiments: {
     en: [{ h: "Experiments" },
       { exp: ["Narrow pages", "Lower the line width to 40: more words get split, and the search test fails more often before cleaning."] },
-      { exp: ["Your own PDF", "Upload a PDF exported from Word. Real extraction often has different problems: missing spaces between words, tables read row by row, columns mixed together. Cleaning rules are always tuned to your documents."] }],
+      { exp: ["Your own PDF", "Upload a PDF exported from Word. Real extraction often has different problems: missing spaces between words, tables read row by row, columns mixed together. Cleaning rules are always tuned to your documents."] },
+      { exp: ["One step at a time", "Press Step and run the search test after each cleaning step. Note which step makes the broken words findable again: Split words. Removing headers or extra spaces first does not help search at all for those words."] }],
     id: [{ h: "Eksperimen" },
       { exp: ["Halaman sempit", "Turunkan lebar baris ke 40: lebih banyak kata terbelah, dan uji pencarian lebih sering gagal sebelum dibersihkan."] },
-      { exp: ["PDF Anda sendiri", "Unggah PDF hasil ekspor Word. Ekstraksi sungguhan sering punya masalah lain: spasi antarkata hilang, tabel terbaca per baris, kolom tercampur. Aturan pembersihan selalu disesuaikan dengan dokumen Anda."] }],
+      { exp: ["PDF Anda sendiri", "Unggah PDF hasil ekspor Word. Ekstraksi sungguhan sering punya masalah lain: spasi antarkata hilang, tabel terbaca per baris, kolom tercampur. Aturan pembersihan selalu disesuaikan dengan dokumen Anda."] },
+      { exp: ["Satu langkah sekaligus", "Tekan Langkah dan jalankan uji pencarian setelah setiap langkah pembersihan. Catat langkah mana yang membuat kata terbelah bisa ditemukan lagi: Kata terbelah. Menghapus header atau spasi berlebih lebih dulu sama sekali tidak membantu pencarian kata-kata itu."] }],
   },
   specs: {
     en: [{ dl: [["Repeated lines", "A line (with digits ignored) that appears 3+ times and is shorter than 80 characters is treated as a header or footer."], ["Split words", "letter + \"-\" + line break + lowercase letter is joined. This can wrongly join real hyphenated words like \"well-\\nknown\"; real pipelines check a dictionary."], ["Scanned PDFs", "Pages that are images contain no text at all. They need OCR (optical character recognition) first."]] }],
@@ -94,7 +97,8 @@ export default {
   stages, text, Board,
   controls: [{ id: "width", label: L("Simulated line width", "Lebar baris simulasi"), min: 40, max: 100, step: 5, default: 60, format: (v) => `${v} ch` }],
   inputs: { document: true },
-  code: [{ id: "clean", label: L("Cleaning (runs here)", "Pembersihan (bisa dijalankan)"), source: pySource, runnable: true, filename: "clean.py" }],
+  code: [{ id: "clean", label: L("Cleaning (runs here)", "Pembersihan (bisa dijalankan)"), source: pySource, runnable: true, filename: "clean.py" },
+    { id: "libs", label: L("Real files, with libraries", "File sungguhan, dengan pustaka"), source: libSource, runnable: false, filename: "loading_libraries.py", note: L("Runs on your computer after: pip install pypdf python-docx", "Jalankan di komputer Anda setelah: pip install pypdf python-docx") }],
   variables: (c) => [["len(raw)", c.raw ? String(c.raw.length) : "—"], ["removed", c.removed ? String(c.removed.length) : "—"], ["fixed", c.fixed != null ? String(c.fixed) : "—"], ["len(clean)", c.clean ? String(c.clean.length) : "—"]],
   python: (c) => ({
     globals: { RAW: c.raw || "" },

@@ -5,6 +5,9 @@ import { testSetFor } from "../../rag/testsets.js";
 import { L, pct, getIndex, quizQ } from "../shared.js";
 import { BarList } from "../../toolkit/charts.jsx";
 import { SECTION_COLORS } from "../../toolkit/DocumentSpace.jsx";
+import pySource from "./small_to_big.py?raw";
+import libSource from "./with_libraries.py?raw";
+import { prelude, stopList } from "../prelude.js";
 
 export function sentenceIndex(doc) {
   const { sections } = rag.parseDocument(doc.text);
@@ -92,8 +95,10 @@ const text = {
       { p: "Kalimat yang disorot adalah yang cocok; teks abu-abu di sekitarnya adalah bagian induk yang masuk ke prompt." }],
   },
   experiments: {
-    en: [{ h: "Experiments" }, { exp: ["Window 0", "Only the matched sentence goes in: precise, but answers split over two sentences go missing."] }, { exp: ["Whole section", "Set the window to the maximum. Compare the token cost with big chunks."] }],
-    id: [{ h: "Eksperimen" }, { exp: ["Jendela 0", "Hanya kalimat yang cocok yang masuk: tepat, tetapi jawaban yang terbagi di dua kalimat hilang."] }, { exp: ["Seluruh bagian", "Atur jendela ke maksimum. Bandingkan biaya token dengan potongan besar."] }],
+    en: [{ h: "Experiments" }, { exp: ["Window 0", "Only the matched sentence goes in: precise, but answers split over two sentences go missing."] }, { exp: ["Whole section", "Set the window to the maximum. Compare the token cost with big chunks."] },
+      { exp: ["Top-1 only", "Set top-k to 1 and window ±1. On the handbook the answer is in the context for every test question, at about half the tokens of one big chunk. Then set top-k to 5: the tokens triple and the hit rate has nowhere left to go."] }],
+    id: [{ h: "Eksperimen" }, { exp: ["Jendela 0", "Hanya kalimat yang cocok yang masuk: tepat, tetapi jawaban yang terbagi di dua kalimat hilang."] }, { exp: ["Seluruh bagian", "Atur jendela ke maksimum. Bandingkan biaya token dengan potongan besar."] },
+      { exp: ["Hanya top-1", "Atur top-k ke 1 dan jendela ±1. Pada buku panduan, jawabannya ada di konteks untuk setiap pertanyaan uji, dengan token sekitar setengah dari satu potongan besar. Lalu atur top-k ke 5: tokennya naik tiga kali lipat dan hit rate tidak bisa naik lagi."] }],
   },
   specs: {
     en: [{ dl: [["Window", "Sentences added on each side of the match, within the same section; the maximum sends the whole section."], ["Big chunks", "80-word chunks searched directly, for comparison."], ["Also called", "Parent-document retrieval, sentence-window retrieval."]] }],
@@ -101,25 +106,6 @@ const text = {
   },
 };
 
-const pySource = `# NalarNusa RAG Visual Lab · Lesson 17 · Small-to-big retrieval
-# @stage small
-sentences = split_into_sentences(document)          # each remembers its section
-ranking = search(question, sentences)               # precise matching on small units
-# @end
-
-# @stage expand
-def parent(i, window):
-    same = [j for j, s in enumerate(sentences) if s["sec"] == sentences[i]["sec"]]
-    pos = same.index(i)
-    return " ".join(sentences[j]["text"] for j in same[max(0, pos - window): pos + window + 1])
-
-context = [parent(i, window=1) for i, _ in ranking[:3]]   # what the model actually reads
-# @end
-
-# @stage compare
-# measure on your test set: is the answer phrase inside the context, and how many tokens did it cost?
-# @end
-`;
 
 export default {
   n: 17, stages, text, Board,
@@ -127,14 +113,41 @@ export default {
   inputs: { document: true, question: true },
   defaultQuestion: { en: "How long can a print run before it needs an overnight slot?", id: "Berapa lama cetakan boleh berjalan sebelum perlu slot malam?" },
   examples: { en: ["How long can a print run before it needs an overnight slot?", "Can the drone kit leave the lab?", "How do I pay for membership?"], id: ["Berapa lama cetakan boleh berjalan sebelum perlu slot malam?", "Apakah kit drone boleh dibawa keluar lab?", "Bagaimana cara membayar keanggotaan?"] },
-  code: [{ id: "s2b", label: L("Small-to-big", "Kecil-ke-besar"), source: pySource, runnable: false, filename: "small_to_big.py", note: L("Pseudocode around lesson 6's search().", "Pseudokode di sekitar search() pelajaran 6.") }],
+  code: [
+    { id: "s2b", label: L("Small-to-big (runs here)", "Kecil-ke-besar (bisa dijalankan)"), source: pySource, runnable: true, filename: "small_to_big.py" },
+    { id: "libs", label: L("With LlamaIndex", "Dengan LlamaIndex"), source: libSource, runnable: false, filename: "small_to_big_llamaindex.py",
+      note: L("Runs on your computer after: pip install llama-index llama-index-embeddings-huggingface", "Jalankan di komputer Anda setelah: pip install llama-index llama-index-embeddings-huggingface") },
+  ],
+  python: (c) => {
+    const I = c.inputs, doc = I.doc, lang = doc.lang, ts = testSetFor(doc), tests = ts ? ts.items : [];
+    return {
+      prelude: prelude("rag", "bm25"),
+      globals: { DOCUMENT: doc.text, QUESTION: I.question || "", TESTS: tests, LANG: lang, STOPWORDS: stopList(lang), WINDOW: I.window, TOP_K: I.topK },
+      call: "demo(DOCUMENT, QUESTION, [tuple(t) for t in TESTS], LANG, STOPWORDS, WINDOW, TOP_K)",
+      compare: (res) => {
+        const si = sentenceIndex(doc), top = rankSents(si, I.question || "", lang).slice(0, I.topK).map((t) => t.i);
+        if (JSON.stringify(res.top) !== JSON.stringify(top)) return false;
+        if (!tests.length) return res.rates == null;
+        const big = getIndex(doc, 80, 0), r = { small: 0, big: 0, s2b: 0 };
+        for (const [q, e] of tests) {
+          const tp = rankSents(si, q, lang).slice(0, I.topK), has = (t) => R.norm(t).includes(R.norm(e));
+          r.small += has(tp.map((t) => si.sents[t.i].text).join(" "));
+          r.s2b += has([...new Set(tp.flatMap((t) => parentOf(si, t.i, I.window).ids))].map((j) => si.sents[j].text).join(" "));
+          r.big += has(R.rankBy(R.tfidfScores(big, q)).slice(0, I.topK).map((t) => big.chunks[t.i].text).join(" "));
+        }
+        return Object.keys(r).every((k) => Math.abs(res.rates[k] - r[k] / tests.length) < 1e-9);
+      },
+    };
+  },
   variables: (c) => [["matched", c.top ? c.top.map((t) => t.i).join(", ") : "—"], ["parent sizes", c.parents ? c.parents.map((p) => p.ids.length).join(", ") + " sentences" : "—"]],
   challenges: [
     { id: "beat", text: L("Find settings where small-to-big contains the answer as often as big chunks, with fewer tokens.", "Temukan pengaturan di mana kecil-ke-besar memuat jawaban sesering potongan besar, dengan token lebih sedikit."), check: (c) => c.evaluation && c.evaluation.s2b >= c.evaluation.big && c.evaluation.tS2b < c.evaluation.tBig },
     { id: "w0", text: L("Set the window to 0 and measure.", "Atur jendela ke 0 lalu ukur."), check: (c) => c.inputs.window === 0 && c.evaluation },
+    { id: "section", text: L("Send whole sections (window at the maximum) and compare the token cost with big chunks.", "Kirim seluruh bagian (jendela maksimum) dan bandingkan biaya token dengan potongan besar."), check: (c) => c.inputs.window >= 4 && c.evaluation },
   ],
   quiz: [
     quizQ(L("What is searched in small-to-big retrieval?", "Apa yang dicari dalam retrieval kecil-ke-besar?"), [L("Small units, such as sentences", "Unit kecil, seperti kalimat"), L("Whole documents", "Seluruh dokumen"), L("The model's memory", "Ingatan model"), L("Random passages", "Bagian acak")], 0, L("Search small for precision, then expand for context.", "Cari yang kecil untuk ketepatan, lalu perluas untuk konteks.")),
     quizQ(L("What is the cost of a very large window?", "Apa biaya jendela yang sangat besar?"), [L("More tokens in every prompt", "Lebih banyak token di setiap prompt"), L("Lower precision of the match", "Ketepatan kecocokan menurun"), L("Slower embedding", "Embedding lebih lambat"), L("None", "Tidak ada")], 0, L("The match stays precise; the prompt just gets longer.", "Kecocokan tetap tepat; hanya prompt yang lebih panjang.")),
+    quizQ(L("Window 0 misses an answer that spans two sentences. What is the fix?", "Jendela 0 melewatkan jawaban yang terbagi di dua kalimat. Apa perbaikannya?"), [L("Widen the window so the neighbouring sentence comes along", "Perlebar jendela agar kalimat tetangga ikut terbawa"), L("Use a bigger embedding model", "Pakai model embedding yang lebih besar"), L("Lower the temperature", "Turunkan temperatur"), L("Remove stopwords", "Hapus stopword")], 0, L("The match was right; the context was too small. Expanding fixes context without hurting the match.", "Kecocokannya sudah benar; konteksnya yang terlalu kecil. Perluasan memperbaiki konteks tanpa merusak kecocokan.")),
   ],
 };
