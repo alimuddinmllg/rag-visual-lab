@@ -19,6 +19,10 @@ Learn retrieval-augmented generation (RAG) by watching it run, changing it, and 
 - **Every lesson** has at least 3 experiments, 3 challenges and 3 quiz questions, in both languages.
 - **Notebooks**: "Download notebook" gives a Jupyter notebook with the lesson's code, the earlier lessons it builds on,
   the learner's document and settings; "Open in Colab" opens the pre-built one in `notebooks/` (default settings).
+- **Home page**, **privacy page** (`#privacy`) and an anonymous **Feedback** button on every page.
+- **Pilot study** (`#pilot`): information sheet and consent, random participant codes, the same 20-item pre/post test,
+  confidence items and SUS, withdrawal (`#pilot/withdraw`) and a researcher page (`#pilot/admin`) for CSV downloads.
+  Answers and feedback go to a Cloudflare D1 database through `functions/api/` (setup in the pilot kit doc).
 - **Level pages** (`#level-N`): progress per lesson and a completion message per level. **Glossary** (`#glossary`):
   53 terms in EN/ID, each linked to its lesson; every lesson's Overview links to its own terms.
 
@@ -41,6 +45,7 @@ Gates still open: the Phase 1 class pilot (pre/post quiz) and the Phase 2 public
 | `npm run preview` | Serve the built site at http://localhost:4173 |
 | `npm run golden` | Check that the Python in the Code tabs gives the same numbers as the visuals (38 cases + all 24 lessons in both languages) |
 | `npm run pylessons` | Only the second part: run every lesson's Python with its default settings and compare with the lesson |
+| `npm run dev:api` | Build, then serve the site with the pilot/feedback API and a local database at http://localhost:8788 (key in `.dev.vars`) |
 | `npm run notebooks` | Rebuild `notebooks/` after changing any lesson's Python or text. `npm run golden` fails if they are out of date |
 
 `npm run golden` needs Python 3 with numpy (`pip install numpy`). It finds `python3`, `python` or `py` automatically.

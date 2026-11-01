@@ -1,7 +1,7 @@
 {
   "name": "nalarnusa-rag-visual-lab",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,9 +9,13 @@
     "preview": "vite preview",
     "golden": "node scripts/golden.mjs && node scripts/run-python-check.mjs && node scripts/python-lessons.mjs && node scripts/notebooks.mjs --check",
     "pylessons": "node scripts/python-lessons.mjs",
-    "notebooks": "node scripts/notebooks.mjs"
+    "notebooks": "node scripts/notebooks.mjs",
+    "dev:api": "vite build && wrangler pages dev dist --d1 DB=local-pilot --port 8788 --compatibility-date=2025-09-01"
   },
   "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "@huggingface/transformers": "^3.7.6",
     "mammoth": "^1.12.3",
     "pdfjs-dist": "^4.10.38",
@@ -20,6 +24,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "4.3.4",
-    "vite": "5.4.21"
+    "vite": "5.4.21",
+    "wrangler": "^4.156.0"
   }
 }

@@ -3,6 +3,10 @@ import { LangContext, useT } from "./i18n.js";
 import { CURRICULUM, LEVELS, lessonHash } from "./engine/registry.js";
 import LevelPage from "./pages/LevelPage.jsx";
 import Glossary from "./pages/Glossary.jsx";
+import Home from "./pages/Home.jsx";
+import Pilot from "./pages/Pilot.jsx";
+import Privacy from "./pages/Privacy.jsx";
+import Feedback from "./toolkit/Feedback.jsx";
 import { LESSONS } from "./lessons/index.js";
 import LessonView from "./engine/LessonView.jsx";
 import { LessonList } from "./toolkit/basics.jsx";
@@ -10,17 +14,20 @@ import { DocsProvider } from "./documents/store.jsx";
 import LLMSettings from "./toolkit/LLMSettings.jsx";
 import { useProgress, isComplete } from "./engine/progress.js";
 
-const DEFAULT_LESSON = 1;
-// Routes: #lesson-NN, #level-N, #glossary, #glossary/<term id>
+// Routes: #home (default), #lesson-NN, #level-N, #glossary, #glossary/<term id>, #pilot, #pilot/<pre|post|withdraw|admin>
 const readHash = () => {
   const h = location.hash;
+  if (!h || h === "#" || h === "#home") return { kind: "home" };
+  if (h === "#privacy") return { kind: "privacy" };
+  const p = h.match(/^#pilot(?:\/(pre|post|withdraw|admin))?$/);
+  if (p) return { kind: "pilot", sub: p[1] || null };
   const lv = h.match(/^#level-(\d)$/);
   if (lv && LEVELS.some((l) => l.n === +lv[1])) return { kind: "level", n: +lv[1] };
   const g = h.match(/^#glossary(?:\/([a-z0-9-]+))?$/);
   if (g) return { kind: "glossary", focus: g[1] || null };
   const m = h.match(/^#lesson-(\d{1,2})$/);
-  const n = m ? +m[1] : DEFAULT_LESSON;
-  return { kind: "lesson", n: CURRICULUM.some((l) => l.n === n) ? n : DEFAULT_LESSON };
+  if (!m || !CURRICULUM.some((l) => l.n === +m[1])) return { kind: "home" };
+  return { kind: "lesson", n: +m[1] };
 };
 const initialLang = () => {
   try { const s = localStorage.getItem("lab-lang"); if (s === "en" || s === "id") return s; } catch { /* storage blocked */ }
@@ -39,9 +46,10 @@ function Shell({ route, setLang }) {
   return (
     <>
       <header className="top">
-        <div className="brand"><h1>{t("brand")}</h1><span className="tag">{t("tagline")}</span><span className="phase">{t("phaseLabel")}</span></div>
+        <div className="brand"><h1><a href="#home" style={{ color: "inherit", textDecoration: "none" }}>{t("brand")}</a></h1><span className="tag">{t("tagline")}</span><span className="phase">{t("phaseLabel")}</span></div>
         <div className="right">
-          <span className="crumb">{meta ? <>{t("level")} {meta.level} › <b>{n}. {tr(meta.title)}</b></> : route.kind === "level" ? <b>{t("level")} {route.n}</b> : <b>{lang === "id" ? "Glosarium" : "Glossary"}</b>}</span>
+          <span className="crumb">{meta ? <>{t("level")} {meta.level} › <b>{n}. {tr(meta.title)}</b></> : route.kind === "level" ? <b>{t("level")} {route.n}</b> : route.kind === "glossary" ? <b>{lang === "id" ? "Glosarium" : "Glossary"}</b> : route.kind === "pilot" ? <b>{lang === "id" ? "Penelitian" : "Study"}</b> : route.kind === "privacy" ? <b>{lang === "id" ? "Privasi" : "Privacy"}</b> : null}</span>
+          <Feedback page={route.kind === "lesson" ? `lesson-${n}` : route.kind === "level" ? `level-${route.n}` : route.kind} lesson={n} />
           <LLMSettings />
           <div className="lang" role="group" aria-label="Language">
             <button aria-pressed={lang === "en"} onClick={() => setLang("en")}>EN</button>
@@ -51,7 +59,7 @@ function Shell({ route, setLang }) {
       </header>
       <main className="grid">
         <LessonList current={n} currentLevel={route.kind === "level" ? route.n : null} builtSet={builtSet} doneSet={doneSet} />
-        {route.kind === "level" ? <LevelPage level={route.n} /> : route.kind === "glossary" ? <Glossary focus={route.focus} /> : lesson ? <LessonView key={n} lesson={lesson} /> : (
+        {route.kind === "home" ? <Home /> : route.kind === "privacy" ? <Privacy /> : route.kind === "pilot" ? <Pilot sub={route.sub} /> : route.kind === "level" ? <LevelPage level={route.n} /> : route.kind === "glossary" ? <Glossary focus={route.focus} /> : lesson ? <LessonView key={n} lesson={lesson} /> : (
           <section className="card soonpage" style={{ gridColumn: "span 2" }}>
             <span className="phase" style={{ justifySelf: "start" }}>{t("level")} {meta.level} · {String(n).padStart(2, "0")}</span>
             <h2>{tr(meta.title)}</h2>
@@ -60,7 +68,7 @@ function Shell({ route, setLang }) {
           </section>
         )}
       </main>
-      <footer>NalarNusa · {lang === "id" ? "Buku panduan NusaBot Robotics Lab adalah teks fiktif untuk latihan. Dokumen yang Anda unggah tetap di browser ini." : "The NusaBot Robotics Lab handbook is fictional sample text. Documents you upload stay in this browser."}</footer>
+      <footer><a href="#privacy">{lang === "id" ? "Privasi" : "Privacy"}</a> · <a href="#pilot">{lang === "id" ? "Penelitian (untuk kelas yang diundang)" : "Study (for invited classes)"}</a> · NalarNusa · {lang === "id" ? "Buku panduan NusaBot Robotics Lab adalah teks fiktif untuk latihan. Dokumen yang Anda unggah tetap di browser ini." : "The NusaBot Robotics Lab handbook is fictional sample text. Documents you upload stay in this browser."}</footer>
     </>
   );
 }
