@@ -75,5 +75,25 @@ for c in extra["ann"]:
     if not ok: print("      py:", ex, fo, c1, c2, "\n      js:", c["exact"], c["found"], c["brute"], c["graph"])
     failures += not ok
 
+sys.path.insert(0, str(LES / "13-bm25")); sys.path.insert(0, str(LES / "14-hybrid")); sys.path.insert(0, str(LES / "20-metrics"))
+import bm25 as B, fusion as F, metrics as M
+from rag_from_scratch import tokenize as tok_py
+idx = {}
+for c in extra["ret"]:
+    lang = c["lang"]; total += 1
+    if lang not in idx:
+        idx[lang] = B.index(docs[lang], lang, set(docs["stopwords"][lang]))
+    chunks, toks = idx[lang]
+    stop = set(docs["stopwords"][lang])
+    sb = B.bm25_scores(toks, tok_py(c["q"], stop, lang))
+    rb = B.rank(sb); rv = B.rank(B.vector_scores(chunks, c["q"], stop, lang)); rf = F.rrf([rb, rv])
+    m = M.metrics_at(rf, M.relevant_for(chunks, c["exp"]), 3)
+    ok = rb == c["bm25"] and all(abs(a - sb[i]) < 1e-9 for i, a in zip(rb, c["bm25s"])) and rv == c["vec"] and rf == c["rrf"] \
+        and all(abs(m[k] - c["m"][k]) < 1e-9 for k in ("recall", "precision", "rr", "ndcg"))
+    if not ok:
+        print(f"FAIL [lessons 13/14/20] {c['q']}\n      py: {rb[:5]} {rv[:5]} {rf[:5]} {m}\n      js: {c['bm25'][:5]} {c['vec'][:5]} {c['rrf'][:5]} {c['m']}")
+    failures += not ok
+print(f"ok   [lessons 13/14/20] BM25, RRF and metrics on {len(extra['ret'])} test questions" if all(True for _ in [0]) else "")
+
 print(f"\n{total - failures}/{total} cases match")
 sys.exit(1 if failures else 0)

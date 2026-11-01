@@ -58,3 +58,15 @@ export function useNeuralVectors(texts, enabled) {
   }, [key]);
   return { ...state, download: state.status === "loading" ? downloadState : null };
 }
+
+/** Embed a set of texts; returns { status, map: Map(text -> vector) | null, ... }. */
+export function useNeuralMap(texts, enabled) {
+  const r = useNeuralVectors(texts, enabled);
+  const [state, setState] = useState({ key: null, map: null });
+  useEffect(() => {
+    if (r.status === "ready" && r.vectors) setState({ key: texts.length, map: new Map(texts.map((t, i) => [t, r.vectors[i]])) });
+    else if (r.status !== "ready") setState({ key: null, map: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [r.status, r.vectors]);
+  return { ...r, map: state.map };
+}

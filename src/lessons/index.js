@@ -11,8 +11,17 @@ import lesson09 from "./09-chunk-size/index.jsx";
 import lesson10 from "./10-metadata/index.jsx";
 import lesson11 from "./11-indexes/index.jsx";
 import lesson12 from "./12-prompt/index.jsx";
+import lesson13 from "./13-bm25/index.jsx";
+import lesson14 from "./14-hybrid/index.jsx";
+import lesson15 from "./15-rerank/index.jsx";
+import lesson16 from "./16-rewrite/index.jsx";
+import lesson17 from "./17-small-to-big/index.jsx";
+import lesson18 from "./18-lost-middle/index.jsx";
+import lesson19 from "./19-testset/index.jsx";
+import lesson20 from "./20-metrics/index.jsx";
+import lesson21 from "./21-faithfulness/index.jsx";
+import lesson22 from "./22-clinic/index.jsx";
+import lesson23 from "./23-refusal/index.jsx";
+import lesson24 from "./24-security/index.jsx";
 
-export const LESSONS = {
-  1: lesson01, 2: lesson02, 3: lesson03, 4: lesson04, 5: lesson05, 6: lesson06,
-  7: lesson07, 8: lesson08, 9: lesson09, 10: lesson10, 11: lesson11, 12: lesson12,
-};
+export const LESSONS = { 1: lesson01, 2: lesson02, 3: lesson03, 4: lesson04, 5: lesson05, 6: lesson06, 7: lesson07, 8: lesson08, 9: lesson09, 10: lesson10, 11: lesson11, 12: lesson12, 13: lesson13, 14: lesson14, 15: lesson15, 16: lesson16, 17: lesson17, 18: lesson18, 19: lesson19, 20: lesson20, 21: lesson21, 22: lesson22, 23: lesson23, 24: lesson24 };

@@ -5,6 +5,8 @@ import * as rag from "../../rag/core.js";
 import STOPWORDS from "../../rag/stopwords.json";
 import * as S from "../../rag/stages.js";
 import { NeuralStatus } from "../../toolkit/LessonParts.jsx";
+import { LLMAnswerBox } from "../../toolkit/LLMSettings.jsx";
+import { useLLMAnswer } from "../../rag/llm.js";
 import DocumentSpace from "../../toolkit/DocumentSpace.jsx";
 import { ChunkList, AnswerPanel } from "../../toolkit/TextPanels.jsx";
 import * as C from "./content.js";
@@ -98,6 +100,7 @@ function Board({ ctx, runner, hover, setHover, tr }) {
 }
 
 function DataPanel({ ctx, runner, hover, setHover }) {
+  const llm = useLLMAnswer(ctx.prompt || "", ctx.prompt ? [{ role: "user", content: ctx.prompt }] : null, !!ctx.prompt);
   const ranks = ctx.top ? new Map(ctx.top.map((t, r) => [t.i, r])) : null;
   const retrieved = ctx.used ? new Set(ctx.used.map((t) => t.i)) : null;
   return (
@@ -107,6 +110,7 @@ function DataPanel({ ctx, runner, hover, setHover }) {
         hover={hover} onHover={setHover} anim={runner.animStage} />
       <AnswerPanel answer={ctx.answer} prompt={ctx.prompt} promptTokens={ctx.promptTokens}
         usedCount={ctx.used ? ctx.used.length : 0} text={C.ui.answer} />
+      <div style={{ gridColumn: "1 / -1", padding: "0 14px 12px" }}><LLMAnswerBox st={llm} /></div>
     </div>
   );
 }

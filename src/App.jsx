@@ -5,6 +5,7 @@ import { LESSONS } from "./lessons/index.js";
 import LessonView from "./engine/LessonView.jsx";
 import { LessonList } from "./toolkit/basics.jsx";
 import { DocsProvider } from "./documents/store.jsx";
+import LLMSettings from "./toolkit/LLMSettings.jsx";
 import { useProgress, isComplete } from "./engine/progress.js";
 
 const DEFAULT_LESSON = 1;
@@ -32,6 +33,7 @@ function Shell({ n, setLang }) {
         <div className="brand"><h1>{t("brand")}</h1><span className="tag">{t("tagline")}</span><span className="phase">{t("phaseLabel")}</span></div>
         <div className="right">
           <span className="crumb">{t("level")} {meta.level} › <b>{n}. {tr(meta.title)}</b></span>
+          <LLMSettings />
           <div className="lang" role="group" aria-label="Language">
             <button aria-pressed={lang === "en"} onClick={() => setLang("en")}>EN</button>
             <button aria-pressed={lang === "id"} onClick={() => setLang("id")}>ID</button>

@@ -57,8 +57,25 @@ const annCases = [[300, 7, 4, 8, 0.3, 0.7], [600, 3, 2, 1, 0.9, 0.1], [200, 11, 
   return { input: { n, seed, M, ef, qx, qy }, exact: b.top, found: g.top, brute: b.comparisons, graph: g.comparisons };
 });
 
+// Phase 2: BM25, RRF and metrics on the built-in test sets
+const coreUrl = "data:text/javascript;base64," + Buffer.from(src).toString("base64");
+const ret = await import("data:text/javascript;base64," + Buffer.from(readFileSync(new URL("../src/rag/retrieval.js", import.meta.url), "utf8").replace('import * as rag from "./core.js";', `import * as rag from "${coreUrl}";`)).toString("base64"));
+const docsUrl = "data:text/javascript;base64," + Buffer.from(docsSrc).toString("base64");
+const TS = (await import("data:text/javascript;base64," + Buffer.from(readFileSync(new URL("../src/rag/testsets.js", import.meta.url), "utf8").replace('from "../documents/nusabot.js"', `from "${docsUrl}"`)).toString("base64"))).TEST_SET;
+const retCases = ["en", "id"].map((lang) => {
+  const idx = ret.buildIndex(lang === "id" ? docs.NUSABOT_ID : docs.NUSABOT_EN, lang, 40, 8);
+  return TS[lang].map(([q, exp]) => {
+    const qt = core.tokenize(q, idx.stop, lang);
+    const bm = ret.rankBy(ret.bm25Scores(idx.bm25, qt));
+    const vec = ret.rankBy(ret.tfidfScores(idx, q));
+    const fused = ret.rrf([bm, vec]);
+    const rel = ret.relevantFor(idx.chunks, exp);
+    return { lang, q, exp, bm25: bm.map((x) => x.i), bm25s: bm.map((x) => x.s), vec: vec.map((x) => x.i), rrf: fused.map((x) => x.i), m: ret.metricsAt(fused, rel, 3) };
+  });
+}).flat();
+
 mkdirSync(new URL("../python/fixtures/", import.meta.url), { recursive: true });
-writeFileSync(new URL("../python/fixtures/js_lessons.json", import.meta.url), JSON.stringify({ lm: lmCases, bpe: bpeCases, ann: annCases }, null, 1));
+writeFileSync(new URL("../python/fixtures/js_lessons.json", import.meta.url), JSON.stringify({ lm: lmCases, bpe: bpeCases, ann: annCases, ret: retCases }, null, 1));
 writeFileSync(new URL("../python/fixtures/js_output.json", import.meta.url), JSON.stringify(out, null, 1));
 writeFileSync(new URL("../python/fixtures/documents.json", import.meta.url),
   JSON.stringify({ en: docs.NUSABOT_EN, id: docs.NUSABOT_ID, stopwords: STOP }));
