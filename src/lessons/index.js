@@ -23,5 +23,13 @@ import lesson21 from "./21-faithfulness/index.jsx";
 import lesson22 from "./22-clinic/index.jsx";
 import lesson23 from "./23-refusal/index.jsx";
 import lesson24 from "./24-security/index.jsx";
+import lesson25 from "./25-scaling/index.jsx";
+import lesson26 from "./26-fresh/index.jsx";
+import lesson27 from "./27-budget/index.jsx";
+import lesson28 from "./28-multimodal/index.jsx";
+import lesson29 from "./29-graphrag/index.jsx";
+import lesson30 from "./30-agentic/index.jsx";
+import lesson31 from "./31-monitoring/index.jsx";
+import lesson32 from "./32-capstone/index.jsx";
 
-export const LESSONS = { 1: lesson01, 2: lesson02, 3: lesson03, 4: lesson04, 5: lesson05, 6: lesson06, 7: lesson07, 8: lesson08, 9: lesson09, 10: lesson10, 11: lesson11, 12: lesson12, 13: lesson13, 14: lesson14, 15: lesson15, 16: lesson16, 17: lesson17, 18: lesson18, 19: lesson19, 20: lesson20, 21: lesson21, 22: lesson22, 23: lesson23, 24: lesson24 };
+export const LESSONS = { 1: lesson01, 2: lesson02, 3: lesson03, 4: lesson04, 5: lesson05, 6: lesson06, 7: lesson07, 8: lesson08, 9: lesson09, 10: lesson10, 11: lesson11, 12: lesson12, 13: lesson13, 14: lesson14, 15: lesson15, 16: lesson16, 17: lesson17, 18: lesson18, 19: lesson19, 20: lesson20, 21: lesson21, 22: lesson22, 23: lesson23, 24: lesson24, 25: lesson25, 26: lesson26, 27: lesson27, 28: lesson28, 29: lesson29, 30: lesson30, 31: lesson31, 32: lesson32 };

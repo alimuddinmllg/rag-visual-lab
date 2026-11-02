@@ -26,7 +26,7 @@ export default function Home() {
       <div className="plain" style={{ display: "grid", gap: 18 }}>
         <div>
           <h2 id="hh" className="hero">{tr(L("Learn RAG by watching it work", "Belajar RAG dengan melihatnya bekerja"))}</h2>
-          <p className="lead">{tr(L("Retrieval-augmented generation, from your first pipeline to evaluation and security: 24 interactive lessons in English and Bahasa Indonesia. Free, no account, runs in your browser.", "Retrieval-augmented generation, dari pipeline pertama sampai evaluasi dan keamanan: 24 pelajaran interaktif dalam bahasa Indonesia dan Inggris. Gratis, tanpa akun, berjalan di browser Anda."))}</p>
+          <p className="lead">{tr(L("Retrieval-augmented generation, from your first pipeline to production: 32 interactive lessons in English and Bahasa Indonesia. Free, no account, runs in your browser.", "Retrieval-augmented generation, dari pipeline pertama sampai produksi: 32 pelajaran interaktif dalam bahasa Indonesia dan Inggris. Gratis, tanpa akun, berjalan di browser Anda."))}</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
             {started && next
               ? <a className="btn primary" href={"#" + lessonHash(next.n)}>{tr(L("Continue", "Lanjutkan"))}: {pad2(next.n)} {tr(next.title)} →</a>

@@ -1,8 +1,8 @@
-# NalarNusa RAG Visual Lab — Phase 2
+# NalarNusa RAG Visual Lab
 
 Learn retrieval-augmented generation (RAG) by watching it run, changing it, and reading the code behind it.
 
-**Built so far: Levels 1–4 (lessons 1–24)**, in English and Bahasa Indonesia, plus:
+**All five levels (lessons 1–32)**, in English and Bahasa Indonesia. Live at https://lab.nalarnusa.id. Plus:
 
 - **Your own documents**: upload PDF, DOCX, TXT or Markdown, or paste text, in any lesson. Parsed in the browser; never uploaded.
 - **Neural embeddings**: a multilingual sentence model (paraphrase-multilingual-MiniLM-L12-v2) running in a Web Worker.
@@ -24,7 +24,7 @@ Learn retrieval-augmented generation (RAG) by watching it run, changing it, and 
   confidence items and SUS, withdrawal (`#pilot/withdraw`) and a researcher page (`#pilot/admin`) for CSV downloads.
   Answers and feedback go to a Cloudflare D1 database through `functions/api/` (setup in the pilot kit doc).
 - **Level pages** (`#level-N`): progress per lesson and a completion message per level. **Glossary** (`#glossary`):
-  53 terms in EN/ID, each linked to its lesson; every lesson's Overview links to its own terms.
+  68 terms in EN/ID, each linked to its lesson; every lesson's Overview links to its own terms.
 
 | Level | Lessons |
 | --- | --- |
@@ -32,8 +32,9 @@ Learn retrieval-augmented generation (RAG) by watching it run, changing it, and 
 | 2 Building blocks | 7 Loading & cleaning · 8 Chunking strategies · 9 Chunk size by measurement · 10 Metadata filtering · 11 Vector indexes · 12 Prompt budget & citations |
 | 3 Better retrieval | 13 BM25 vs vector · 14 Hybrid search & RRF · 15 Re-ranking · 16 Query rewriting, multi-query, HyDE · 17 Small-to-big · 18 Lost in the middle & compression |
 | 4 Evaluation & reliability | 19 Building a test set · 20 Retrieval metrics · 21 Faithfulness · 22 Failure clinic · 23 Refusal tuning · 24 Prompt injection & access control |
+| 5 Production | 25 Scaling (IVF, nprobe, memory) · 26 Keeping the index fresh (hashes, dedup, sync) · 27 Cost & latency budgets · 28 Tables, images & multimodal · 29 GraphRAG · 30 Agentic RAG · 31 Monitoring & alerts · 32 Capstone on your own document |
 
-Gates still open: the Phase 1 class pilot (pre/post quiz) and the Phase 2 public-launch check.
+Gates still open: the class pilot (pre/post test, `#pilot`) and the public-launch check. Level 5 was built before the pilot ran; the pilot covers Levels 1–4.
 
 ## Run it
 
@@ -43,7 +44,7 @@ Gates still open: the Phase 1 class pilot (pre/post quiz) and the Phase 2 public
 | `npm run dev` | Development server at http://localhost:5173 |
 | `npm run build` | Static site in `dist/` |
 | `npm run preview` | Serve the built site at http://localhost:4173 |
-| `npm run golden` | Check that the Python in the Code tabs gives the same numbers as the visuals (38 cases + all 24 lessons in both languages) |
+| `npm run golden` | Check that the Python in the Code tabs gives the same numbers as the visuals (38 cases + all 32 lessons in both languages + notebooks) |
 | `npm run pylessons` | Only the second part: run every lesson's Python with its default settings and compare with the lesson |
 | `npm run dev:api` | Build, then serve the site with the pilot/feedback API and a local database at http://localhost:8788 (key in `.dev.vars`) |
 | `npm run notebooks` | Rebuild `notebooks/` after changing any lesson's Python or text. `npm run golden` fails if they are out of date |
@@ -127,8 +128,8 @@ Where a lesson's Python is a twin of its JavaScript, `npm run golden` checks the
 the RAG pipeline (`rag/core.js` ↔ lesson 6), the n-gram language model (`rag/ngram.js` ↔ lesson 1),
 BPE (`rag/bpe.js` ↔ lesson 3), the vector index (`rag/ann.js` ↔ lesson 11), and BM25 ranking, RRF and the
 retrieval metrics (`rag/retrieval.js` ↔ lessons 13, 14, 20) on all 20 built-in test questions.
-It then runs the from-scratch Python of all 24 lessons in both languages through each lesson's own `compare()`
-(48 runs). Run it before every deploy.
+It then runs the from-scratch Python of all 32 lessons in both languages through each lesson's own `compare()`
+(64 runs), and checks the 64 notebooks are up to date. Run it before every deploy.
 
 ### Honest findings built into the lessons
 
@@ -143,6 +144,10 @@ In the app, "Run this Python in your browser" does the same check live for the l
 - The "with libraries" files are read-only in the browser: they need packages or a model server on your computer.
 - The from-scratch Python of lessons 16, 18, 19, 21 and 24 covers the simulated parts; the real-LLM parts are in their "with libraries" files.
 - Lesson 24's vulnerable model is simulated; connect a real LLM to test a real one.
+- Level 5 simulates what would need infrastructure: lesson 25 runs IVF on 2D points (the FAISS file runs it on 384-dimension vectors),
+  lesson 27 uses example timings and prices, lesson 29 is given its entity list (an LLM extracts it in practice),
+  lesson 30's agent decisions are rules (an LLM decides in practice), and lesson 31's 30-day log is seeded traffic.
+  Every one of these is said in the lesson's Specs tab, and the "with libraries" file shows the real version.
 - Calling an LLM from the browser needs the endpoint to allow it (CORS) and, in Chrome, the local-network permission. See the LLM panel.
 - Lesson 9 uses the built-in handbook's test set; own documents need their own test set (lesson 19, Phase 2).
 - Indonesian has no stemmer: "biayanya" does not match "biaya" with TF-IDF. Neural embeddings handle it.
