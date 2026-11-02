@@ -6,6 +6,7 @@ import { testSetFor, TEST_SET, HANDBOOK } from "../../rag/testsets.js";
 import { chat, llmReady, useLLM } from "../../rag/llm.js";
 import { L, pct, getIndex, quizQ } from "../shared.js";
 import { BarList } from "../../toolkit/charts.jsx";
+import { LabModelButton } from "../../toolkit/LLMSettings.jsx";
 import pySource from "./compress.py?raw";
 import libSource from "./with_libraries.py?raw";
 import { prelude, stopList } from "../prelude.js";
@@ -63,7 +64,7 @@ function PositionTest({ inputs, tr }) {
       <h3 style={{ fontSize: 14.5, margin: "0 0 6px" }}>{tr(L("Lost in the middle: test your own LLM", "Hilang di tengah: uji LLM Anda sendiri"))}</h3>
       <p className="note" style={{ marginTop: 0 }}>{tr(L("Puts the passage with the answer at position 1, 2, … among other passages and asks the same question each time.", "Meletakkan bagian berisi jawaban di posisi 1, 2, … di antara bagian lain dan menanyakan pertanyaan yang sama setiap kali."))} <b>“{TEST_SET[lang][inputs.qi][0]}”</b></p>
       <button className="btn primary" disabled={!llmReady(s) || res?.busy} onClick={run}>▶ {tr(L(`Run ${inputs.n} positions`, `Jalankan ${inputs.n} posisi`))}</button>
-      {!llmReady(s) && <p className="note">{tr(L("Connect an LLM with the button in the header to run this. Small local models show the effect most clearly.", "Hubungkan LLM dengan tombol di header untuk menjalankan ini. Model lokal kecil paling jelas menunjukkan efeknya."))}</p>}
+      {!llmReady(s) && <div style={{ marginTop: 8 }}><LabModelButton>{tr(L("This test needs an LLM. Small models show the effect most clearly.", "Uji ini butuh LLM. Model kecil paling jelas menunjukkan efeknya."))}</LabModelButton></div>}
       {res && <div className="chips" style={{ marginTop: 10 }}>{res.out.map((r) => <span key={r.p} className="chip" title={r.a} style={{ borderColor: r.ok ? "var(--good)" : "var(--warn)" }}>{r.p}: {r.ok ? "✓" : "✗"}</span>)}{res.busy && <span className="note">…</span>}</div>}
     </div>
   );

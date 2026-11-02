@@ -101,6 +101,15 @@ export function NeuralStatus({ neural }) {
   return <p className="note busy">⏳ {text} {t("neuralFallback")}</p>;
 }
 
+// Options are written with the correct answer first; show them in a fixed shuffled order per question,
+// the same for every learner and every visit (so the answer is not always the first option).
+export function optionOrder(lesson, q, n) {
+  let s = (lesson * 7919 + q * 104729 + 17) % 2147483647;
+  const order = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) { s = (s * 16807) % 2147483647; const j = s % (i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+  return order;
+}
+
 export function ChallengePanel({ lesson, ctx }) {
   const { t, tr } = useT();
   const { progress, passChallenge, saveQuiz, reset } = useProgress();
@@ -140,7 +149,8 @@ export function ChallengePanel({ lesson, ctx }) {
           {quiz.map((q, i) => (
             <fieldset key={i} className="qz">
               <legend><Inline text={tr(q.q)} /></legend>
-              {q.options.map((o, j) => {
+              {optionOrder(lesson.n, i, q.options.length).map((j) => {
+                const o = q.options[j];
                 const state = checked ? (j === q.answer ? "right" : picks[i] === j ? "wrong" : "") : "";
                 return (
                   <label key={j} className={`opt ${state}`}>

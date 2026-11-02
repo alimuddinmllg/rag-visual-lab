@@ -46,7 +46,7 @@ function Shell({ route, setLang }) {
   return (
     <>
       <header className="top">
-        <div className="brand"><h1><a href="#home" style={{ color: "inherit", textDecoration: "none" }}>{t("brand")}</a></h1><span className="tag">{t("tagline")}</span><span className="phase">{t("phaseLabel")}</span></div>
+        <div className="brand"><h1><a href="#home" style={{ color: "inherit", textDecoration: "none" }}>{t("brand")}</a></h1><span className="tag">{t("tagline")}</span>{t("phaseLabel") && <span className="phase">{t("phaseLabel")}</span>}</div>
         <div className="right">
           <span className="crumb">{meta ? <>{t("level")} {meta.level} › <b>{n}. {tr(meta.title)}</b></> : route.kind === "level" ? <b>{t("level")} {route.n}</b> : route.kind === "glossary" ? <b>{lang === "id" ? "Glosarium" : "Glossary"}</b> : route.kind === "pilot" ? <b>{lang === "id" ? "Penelitian" : "Study"}</b> : route.kind === "privacy" ? <b>{lang === "id" ? "Privasi" : "Privacy"}</b> : null}</span>
           <Feedback page={route.kind === "lesson" ? `lesson-${n}` : route.kind === "level" ? `level-${route.n}` : route.kind} lesson={n} />

@@ -1,11 +1,20 @@
-// Optional: real LLM answers from any OpenAI-compatible endpoint (Ollama, LM Studio, OpenRouter, Groq, OpenAI…).
-// Settings live only in this browser. Requests go straight from the browser to the endpoint you set.
+// Optional: real LLM answers. Three ways, all OpenAI-compatible:
+//   lab    the lab's own model (/api/llm, Cloudflare Workers AI): no setup, no key, a daily limit per person
+//   own    any hosted service with the learner's own key (Groq, OpenRouter, Google AI Studio, OpenAI…)
+//   ollama a model on the learner's own computer
+// Settings live only in this browser. For "own" and "ollama", requests go straight from the browser to that address.
 import { useEffect, useState } from "react";
 
 const KEY = "lab-llm-v1";
 const listeners = new Set();
-let settings = (() => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; } })()
-  || { enabled: false, baseUrl: "http://localhost:11434/v1", model: "llama3.2", apiKey: "" };
+export const PRESETS = {
+  lab: { provider: "lab", baseUrl: "/api/llm", model: "lab", apiKey: "" },
+  own: { provider: "own", baseUrl: "", model: "", apiKey: "" },
+  ollama: { provider: "ollama", baseUrl: "http://localhost:11434/v1", model: "llama3.2", apiKey: "" },
+};
+const guessProvider = (s) => (s.baseUrl === "/api/llm" ? "lab" : /localhost|127\.0\.0\.1/.test(s.baseUrl || "") ? "ollama" : "own");
+let settings = (() => { try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); return s && { ...s, provider: s.provider || guessProvider(s) }; } catch { return null; } })()
+  || { enabled: false, ...PRESETS.lab };
 
 export function saveLLM(next) {
   settings = next;
@@ -17,16 +26,23 @@ export function useLLM() {
   useEffect(() => { listeners.add(setS); return () => listeners.delete(setS); }, []);
   return s;
 }
-export const llmReady = (s = settings) => s.enabled && s.baseUrl && s.model;
+export const llmReady = (s = settings) => !!(s.enabled && s.baseUrl && s.model);
+export const enableLabModel = () => saveLLM({ ...PRESETS.lab, enabled: true });
 
 export async function chat(messages, { temperature = 0, maxTokens = 300 } = {}) {
   const s = settings;
   const res = await fetch(s.baseUrl.replace(/\/$/, "") + "/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(s.apiKey ? { Authorization: `Bearer ${s.apiKey}` } : {}) },
+    headers: { "Content-Type": "application/json", ...(s.apiKey ? { Authorization: `Bearer ${s.apiKey}` } : {}),
+      ...(s.provider === "lab" ? { "x-lab-lang": (() => { try { return document.documentElement.lang || localStorage.getItem("lab-lang") || "en"; } catch { return "en"; } })() } : {}) },
     body: JSON.stringify({ model: s.model, messages, temperature, max_tokens: maxTokens }),
   });
-  if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) {
+    const body = await res.text();
+    let msg = body.slice(0, 200);
+    try { const j = JSON.parse(body); msg = j.error?.message || j.error || msg; } catch { /* not JSON */ }
+    throw new Error(`${res.status}: ${msg}`);
+  }
   const j = await res.json();
   return j.choices?.[0]?.message?.content ?? "";
 }

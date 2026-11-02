@@ -32,7 +32,7 @@ const STRINGS = {
     comingSoonBody: "It will be added on the same engine as the other lessons.",
     openLesson6: "Start at lesson 1",
     stageWaiting: "waiting",
-    phaseLabel: "Beta",
+    phaseLabel: "",   // set to e.g. "Beta" to show a label next to the name
     tab_overview: "Overview", tab_pipeline: "Pipeline", tab_examples: "Examples", tab_specs: "Specs", tab_challenge: "Challenge",
     pipelineIntro: "Click a step to see its code. The highlighted card is the step that just ran.",
     examplesHead: "Try these questions",
@@ -93,7 +93,7 @@ const STRINGS = {
     comingSoonBody: "Pelajaran ini akan ditambahkan di atas mesin yang sama dengan pelajaran lain.",
     openLesson6: "Mulai dari pelajaran 1",
     stageWaiting: "menunggu",
-    phaseLabel: "Beta",
+    phaseLabel: "",   // set to e.g. "Beta" to show a label next to the name
     tab_overview: "Ikhtisar", tab_pipeline: "Pipeline", tab_examples: "Contoh", tab_specs: "Spesifikasi", tab_challenge: "Tantangan",
     pipelineIntro: "Klik sebuah langkah untuk melihat kodenya. Kartu yang disorot adalah langkah yang baru berjalan.",
     examplesHead: "Coba pertanyaan ini",

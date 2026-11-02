@@ -8,10 +8,13 @@ Learn retrieval-augmented generation (RAG) by watching it run, changing it, and 
 - **Neural embeddings**: a multilingual sentence model (paraphrase-multilingual-MiniLM-L12-v2) running in a Web Worker.
   Opt-in per lesson (lessons 4, 6, 10, 12); ~120 MB downloaded once from Hugging Face, then cached by the browser.
 - **Challenges and quizzes** in every lesson; progress is saved in the browser and lessons get a ✓ when complete.
-- **Optional real LLM** (header button): any OpenAI-compatible endpoint, e.g. Ollama on your own computer
-  (base URL `http://localhost:11434/v1`; the LLM panel has step-by-step setup for Windows, macOS and Linux,
-  allowing only the lab's own address). Used in lessons 6, 16, 18, 19, 21, 24.
-  Settings and key stay in the browser; requests go straight from the browser to that endpoint.
+- **Optional real LLM** (header button), three ways. Used in lessons 6, 16, 18, 19, 21, 24.
+  - **The lab's model** (default choice, one click): `functions/api/llm/chat/completions.js` runs an open model on
+    Cloudflare Workers AI. Students need no computer power and no key. Limits per person and per day keep a class
+    inside Workers AI's free daily allocation (10,000 neurons; roughly a thousand short answers).
+  - **A hosted service with the student's own key** (Groq, OpenRouter, Google AI Studio, OpenAI…).
+  - **Ollama on the student's computer** (base URL `http://localhost:11434/v1`; step-by-step setup in the panel).
+  For the last two, settings and key stay in the browser and requests go straight from the browser to that endpoint.
 - **Your own test sets** (lesson 19), saved per document and used by lessons 14–23.
 - **Code in every lesson, two ways**: a from-scratch Python file that runs in the browser (Pyodide) and is checked
   against the visual, and a "with libraries" file (sentence-transformers, LangChain, LlamaIndex, Chroma, FAISS,
@@ -62,7 +65,14 @@ Gates still open: the class pilot (pre/post test, `#pilot`) and the public-launc
 5. Every push to `main` deploys. Run `npm run golden` before pushing.
 
 The lessons need no server, database or API key: everything runs in the learner's browser.
-Only the pilot study uses the server: a D1 database bound as `DB` and an `EXPORT_KEY` secret, both set in the Pages project settings.
+The server parts are optional and set in the Pages project (Settings → Bindings / Variables and secrets):
+
+| Binding or variable | Used for |
+| --- | --- |
+| D1 database `DB` | pilot answers, feedback, the lab model's daily counters |
+| secret `EXPORT_KEY` | downloading pilot data; also salts the lab model's daily counters |
+| Workers AI `AI` | the lab's model (`/api/llm`) |
+| `LLM_PER_USER`, `LLM_PER_DAY`, `LLM_MODEL` (optional) | lab model limits (default 40 and 1000 answers a day) and model (default `@cf/meta/llama-3.1-8b-instruct-fp8-fast`) |
 
 ## How it fits together
 

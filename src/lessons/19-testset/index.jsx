@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { loadUserSets, saveUserSet } from "../../rag/testsets.js";
 import { chat, llmReady, useLLM } from "../../rag/llm.js";
 import { L, quizQ } from "../shared.js";
+import { LabModelButton } from "../../toolkit/LLMSettings.jsx";
 import pySource from "./test_set.py?raw";
 import libSource from "./with_libraries.py?raw";
 
@@ -61,7 +62,7 @@ function Board({ ctx, inputs, tr }) {
         ))}
         {!!items.length && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <button className="btn primary" onClick={save}>{tr(L("Save test set", "Simpan set uji"))}</button>
-          <button className="btn" disabled={!llmReady(s) || msg?.busy} onClick={llmDraft}>{tr(L("Rewrite questions with my LLM", "Tulis ulang pertanyaan dengan LLM saya"))}</button>
+          {llmReady(s) ? <button className="btn" disabled={msg?.busy} onClick={llmDraft}>{tr(L("Rewrite questions with the LLM", "Tulis ulang pertanyaan dengan LLM"))}</button> : <LabModelButton>{tr(L("to rewrite the questions in natural words", "untuk menulis ulang pertanyaan dengan kata-kata alami"))}</LabModelButton>}
           <button className="btn" onClick={() => navigator.clipboard?.writeText(JSON.stringify(items.filter((x) => x[2]).map((x) => ({ question: x[0], expected: x[1] })), null, 2)).catch(() => {})}>{tr(L("Copy as JSON", "Salin sebagai JSON"))}</button>
         </div>}
         {msg && !msg.busy && <p className={`note${msg.ok ? "" : " bad"}`}>{msg.ok ? tr(L(`Saved ${msg.n} questions for this document.`, `${msg.n} pertanyaan tersimpan untuk dokumen ini.`)) : tr(L("Couldn't save (browser storage blocked).", "Tidak bisa menyimpan (penyimpanan browser diblokir)."))}</p>}
