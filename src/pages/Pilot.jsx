@@ -280,6 +280,12 @@ function Admin() {
       setSum({ pre: pre.length, post: postR.length, pairs: pairs.length, preMean: mean(pairs.map(([a]) => a.score)), postMean: mean(pairs.map(([, b]) => b.score)), gain: mean(gains), sus: mean(postR.map((r) => r.sus_score).filter((x) => x != null)), classes: [...new Set(rows.map((r) => r.class_code || "—"))].join(", ") });
     } catch (e) { setMsg(e.message); }
   };
+  const [use, setUse] = useState(null);
+  const usage = async () => {
+    setMsg(null);
+    try { const r = await fetch("/api/llm/usage", { headers: { authorization: "Bearer " + key } }); const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); setUse(j); }
+    catch (e) { setMsg(e.message); }
+  };
   const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : "—");
   return (
     <>
@@ -290,8 +296,16 @@ function Admin() {
         <button className="btn" type="button" disabled={!key} onClick={() => download("pilot")}>{tr(L("Download test answers (CSV)", "Unduh jawaban tes (CSV)"))}</button>
         <button className="btn" type="button" disabled={!key} onClick={() => download("feedback")}>{tr(L("Download feedback (CSV)", "Unduh masukan (CSV)"))}</button>
         <button className="btn primary" type="button" disabled={!key} onClick={summary}>{tr(L("Show summary", "Tampilkan ringkasan"))}</button>
+        <button className="btn" type="button" disabled={!key} onClick={usage}>{tr(L("Lab model usage", "Pemakaian model lab"))}</button>
       </div>
       {msg && <p className="note bad" role="alert">{msg}</p>}
+      {use && (
+        <>
+          <p className="note" style={{ margin: "8px 0 0" }}>{tr(L(`Limits per day: ${use.limits.per_person} answers per person, ${use.limits.per_network} per network, ${use.limits.per_day} in total. Model ${use.ai ? "connected" : "NOT connected"}.`, `Batas per hari: ${use.limits.per_person} jawaban per orang, ${use.limits.per_network} per jaringan, ${use.limits.per_day} total. Model ${use.ai ? "terhubung" : "TIDAK terhubung"}.`))}</p>
+          <table className="lvtable"><thead><tr><th>{tr(L("Day (UTC)", "Hari (UTC)"))}</th><th>{tr(L("Answers", "Jawaban"))}</th><th>{tr(L("People", "Orang"))}</th><th>{tr(L("Networks", "Jaringan"))}</th><th>{tr(L("Most by one person", "Terbanyak oleh satu orang"))}</th></tr></thead>
+            <tbody>{use.days.length ? use.days.map((d) => <tr key={d.day}><td>{d.day}</td><td>{d.answers} / {use.limits.per_day}</td><td>{d.people}</td><td>{d.networks}</td><td>{d.most_by_one}</td></tr>) : <tr><td colSpan={5}>{tr(L("No use yet.", "Belum ada pemakaian."))}</td></tr>}</tbody></table>
+        </>
+      )}
       {sum && (
         <table className="lvtable"><tbody>
           <tr><th>{tr(L("Pre-tests / post-tests", "Tes awal / tes akhir"))}</th><td>{sum.pre} / {sum.post}</td></tr>

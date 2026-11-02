@@ -29,19 +29,28 @@ export function useLLM() {
 export const llmReady = (s = settings) => !!(s.enabled && s.baseUrl && s.model);
 export const enableLabModel = () => saveLLM({ ...PRESETS.lab, enabled: true });
 
+/** A random code kept in this browser, so the lab model counts people on a shared Wi-Fi separately. */
+function clientId() {
+  try {
+    let id = localStorage.getItem("lab-client-id");
+    if (!id) { id = (crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36)); localStorage.setItem("lab-client-id", id); }
+    return id;
+  } catch { return ""; }
+}
+
 export async function chat(messages, { temperature = 0, maxTokens = 300 } = {}) {
   const s = settings;
   const res = await fetch(s.baseUrl.replace(/\/$/, "") + "/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(s.apiKey ? { Authorization: `Bearer ${s.apiKey}` } : {}),
-      ...(s.provider === "lab" ? { "x-lab-lang": (() => { try { return document.documentElement.lang || localStorage.getItem("lab-lang") || "en"; } catch { return "en"; } })() } : {}) },
+      ...(s.provider === "lab" ? { "x-lab-client": clientId(), "x-lab-lang": (() => { try { return document.documentElement.lang || localStorage.getItem("lab-lang") || "en"; } catch { return "en"; } })() } : {}) },
     body: JSON.stringify({ model: s.model, messages, temperature, max_tokens: maxTokens }),
   });
   if (!res.ok) {
     const body = await res.text();
     let msg = body.slice(0, 200);
     try { const j = JSON.parse(body); msg = j.error?.message || j.error || msg; } catch { /* not JSON */ }
-    throw new Error(`${res.status}: ${msg}`);
+    throw new Error(res.status === 429 ? msg : `${res.status}: ${msg}`);   // limit messages are written for students
   }
   const j = await res.json();
   return j.choices?.[0]?.message?.content ?? "";

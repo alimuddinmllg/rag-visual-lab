@@ -72,7 +72,7 @@ The server parts are optional and set in the Pages project (Settings → Binding
 | D1 database `DB` | pilot answers, feedback, the lab model's daily counters |
 | secret `EXPORT_KEY` | downloading pilot data; also salts the lab model's daily counters |
 | Workers AI `AI` | the lab's model (`/api/llm`) |
-| `LLM_PER_USER`, `LLM_PER_DAY`, `LLM_MODEL` (optional) | lab model limits (default 60 per person and 1200 in total a day) and model (default `@cf/meta/llama-3.1-8b-instruct-fp8-fast`) |
+| `LLM_PER_USER`, `LLM_PER_IP`, `LLM_PER_DAY`, `LLM_MODEL` (optional) | lab model limits per day: 60 per person (browser), 600 per network (a class on one Wi-Fi), 1200 in total; and the model (default `@cf/meta/llama-3.1-8b-instruct-fp8-fast`). Usage per day: `#pilot/admin` → Lab model usage |
 
 ## How it fits together
 
