@@ -10,7 +10,7 @@ import { GENERAL_EN, GENERAL_ID } from "../documents/general.js";
 import STOPWORDS from "../rag/stopwords.json";
 
 export const REPO = "alimuddinmllg/rag-visual-lab";
-export const LAB_URL = "https://rag-visual-lab.pages.dev";
+export const LAB_URL = "https://lab.nalarnusa.id";
 export const notebookName = (n, lang) => `lesson-${String(n).padStart(2, "0")}-${lang}.ipynb`;
 export const colabUrl = (n, lang) => `https://colab.research.google.com/github/${REPO}/blob/main/notebooks/${notebookName(n, lang)}`;
 

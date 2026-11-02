@@ -55,11 +55,13 @@ Gates still open: the Phase 1 class pilot (pre/post quiz) and the Phase 2 public
 1. Push this folder to a GitHub repository.
 2. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git** → pick the repo.
 3. Build command `npm run build`, output directory `dist`, environment variable `NODE_VERSION` = `20`.
-4. Project → **Custom domains** → add `lab.nalarnusa.com` *first*, then create the DNS record:
-   CNAME `lab` → `<project>.pages.dev` (Cloudflare adds it for you if the domain's DNS is on Cloudflare).
+4. Project → **Custom domains** → add `lab.nalarnusa.id` *first*, then create the DNS record:
+   CNAME `lab` → `rag-visual-lab.pages.dev`. nalarnusa.id's DNS is in a different Cloudflare login, so add the record there by hand.
+   Live at https://lab.nalarnusa.id (the pages.dev address keeps working).
 5. Every push to `main` deploys. Run `npm run golden` before pushing.
 
-No server, database or API key is needed. Everything runs in the learner's browser.
+The lessons need no server, database or API key: everything runs in the learner's browser.
+Only the pilot study uses the server: a D1 database bound as `DB` and an `EXPORT_KEY` secret, both set in the Pages project settings.
 
 ## How it fits together
 
