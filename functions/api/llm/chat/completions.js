@@ -1,8 +1,8 @@
 // POST /api/llm/chat/completions — the lab's own model, so students need no computer power and no API key.
 // OpenAI-compatible in and out, so the browser uses it exactly like Ollama or any hosted service.
 // Runs on Cloudflare Workers AI (binding "AI"). Limits keep the class inside the free daily allocation:
-//   LLM_PER_USER  answers per person per day (default 40)
-//   LLM_PER_DAY   answers for everyone per day (default 1000)
+//   LLM_PER_USER  answers per person per day (default 60)
+//   LLM_PER_DAY   answers for everyone per day (default 1200)
 //   LLM_MODEL     Workers AI model id (default below)
 // Nothing from the prompt is stored. The only record is a daily counter keyed by a salted hash of the IP address.
 import { db, handle, json, readBody, HttpError } from "../../../../functions-lib/db.js";
@@ -44,7 +44,7 @@ export async function countUse(env, ip, lang = "en") {
   await d.prepare("CREATE TABLE IF NOT EXISTS llm_usage (day TEXT NOT NULL, who TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, who))").run();
   const day = new Date().toISOString().slice(0, 10);
   const who = await sha256(`${ip}|${day}|${env.EXPORT_KEY || "lab"}`);        // changes every day; no raw IP is kept
-  const perUser = +env.LLM_PER_USER || 40, perDay = +env.LLM_PER_DAY || 1000;
+  const perUser = +env.LLM_PER_USER || 60, perDay = +env.LLM_PER_DAY || 1200;
   const total = (await d.prepare("SELECT COALESCE(SUM(n), 0) AS t FROM llm_usage WHERE day = ?").bind(day).first()).t;
   if (total >= perDay) throw new HttpError(429, T.day);
   const mine = (await d.prepare("SELECT n FROM llm_usage WHERE day = ? AND who = ?").bind(day, who).first())?.n || 0;

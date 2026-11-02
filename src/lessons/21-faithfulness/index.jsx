@@ -48,7 +48,7 @@ const stages = [
       let answer = ext;
       if (src === "closed") answer = closedBook(q, idx.lang);
       if (src === "mixed") answer = ext + " " + closedBook(q, idx.lang);
-      if (src === "llm") answer = c.inputs.llmAns?.status === "ready" ? c.inputs.llmAns.text : c.inputs.llmAns?.status === "error" ? "(LLM error: " + c.inputs.llmAns.error + ")" : "(waiting for your LLM…)";
+      if (src === "llm") answer = c.inputs.llmAns?.status === "ready" ? c.inputs.llmAns.text.replace(/\s*\[\d+\]/g, "") : c.inputs.llmAns?.status === "error" ? "(LLM error: " + c.inputs.llmAns.error + ")" : "(waiting for your LLM…)";
       return { answer };
     },
     log: (c) => ({ text: c.answer.slice(0, 100) }), live: (c) => c.inputs.source },

@@ -55,8 +55,11 @@ export function useLLMAnswer(key, messages, enabled) {
     if (!enabled || !llmReady(s) || !messages) { setSt({ status: "off" }); return; }
     let alive = true;
     setSt({ status: "loading" });
-    chat(messages).then((text) => alive && setSt({ status: "ready", text })).catch((e) => alive && setSt({ status: "error", error: e.message }));
-    return () => { alive = false; };
+    // Wait until the prompt stops changing (a slider being dragged), so one move costs one answer, not twenty.
+    const timer = setTimeout(() => {
+      chat(messages).then((text) => alive && setSt({ status: "ready", text })).catch((e) => alive && setSt({ status: "error", error: e.message }));
+    }, 900);
+    return () => { alive = false; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled, s.baseUrl, s.model, s.enabled]);
   return st;
