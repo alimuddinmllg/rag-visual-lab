@@ -1,5 +1,6 @@
 # NalarNusa RAG Visual Lab · Lesson 12 · Prompt assembly with real token counts and a chat API
 # pip install openai tiktoken sentence-transformers
+import os
 import tiktoken
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer, util
@@ -36,6 +37,8 @@ messages = [{"role": "system", "content": SYSTEM},
 # @end
 
 # @stage cite
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")   # any OpenAI-compatible server
-print(client.chat.completions.create(model="qwen2.5:7b-instruct", messages=messages, max_tokens=500).choices[0].message.content)
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+client = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))   # any OpenAI-compatible server
+MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b-instruct")
+print(client.chat.completions.create(model=MODEL, messages=messages, max_tokens=500).choices[0].message.content)
 # @end

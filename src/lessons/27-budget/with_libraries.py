@@ -1,6 +1,7 @@
 # NalarNusa RAG Visual Lab · Lesson 27 · Measure a real pipeline: milliseconds per step, real token counts, cost per query
 # pip install openai tiktoken sentence-transformers numpy
 # Works with any OpenAI-compatible endpoint, e.g. Ollama: base_url="http://localhost:11434/v1", api_key="ollama"
+import os
 import time
 import numpy as np
 import tiktoken
@@ -8,8 +9,9 @@ from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 
 PRICE = {"in": 0.15, "out": 0.60}            # USD per million tokens: put YOUR provider's prices here
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-MODEL = "llama3.2"
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+client = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))
+MODEL = os.environ.get("LLM_MODEL", "llama3.2")
 enc = tiktoken.get_encoding("cl100k_base")    # close enough for budgeting; use the model's own tokenizer if you have it
 timings = {}
 

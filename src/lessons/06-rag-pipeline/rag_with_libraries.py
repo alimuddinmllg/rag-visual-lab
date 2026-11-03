@@ -1,10 +1,11 @@
 # NalarNusa RAG Visual Lab · Lesson 6 · The same pipeline with common libraries
-# pip install sentence-transformers numpy ollama
-# Runs on your own computer, no paid API: the answer comes from a local model via Ollama.
+# pip install sentence-transformers numpy openai
+# No paid API: the answer comes from Ollama on your computer, or from the lab's free model when this runs in Colab.
+import os
 import re
 import numpy as np
 from sentence_transformers import SentenceTransformer
-import ollama
+from openai import OpenAI
 
 DOCUMENT = open("handbook.txt", encoding="utf-8").read()
 QUESTION = "How much does PLA printing cost?"
@@ -47,6 +48,7 @@ prompt = (
     f"Context:\n{context or '(no relevant chunks found)'}\n\n"
     f"Question: {QUESTION}\nAnswer:"
 )
-reply = ollama.chat(model="llama3.2", messages=[{"role": "user", "content": prompt}])
-print(reply["message"]["content"])
+client = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))
+reply = client.chat.completions.create(model=os.environ.get("LLM_MODEL", "llama3.2"), messages=[{"role": "user", "content": prompt}])
+print(reply.choices[0].message.content)
 # @end

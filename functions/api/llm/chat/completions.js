@@ -10,21 +10,39 @@
 import { db, handle, json, readBody, HttpError } from "../../../../functions-lib/db.js";
 
 export const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8-fast";
-const MAX_CHARS = 16000, MAX_OUT = 400;
+const MAX_CHARS = 24000, MAX_OUT = 600;
 
 async function sha256(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
 }
 
+// Accepts OpenAI chat messages, including an agent's tool calls and tool results (lesson 30),
+// and turns them into the plain role/content pairs the Workers AI model reads.
 export function cleanMessages(messages) {
-  if (!Array.isArray(messages) || !messages.length || messages.length > 12) throw new HttpError(400, "Send 1 to 12 messages.");
+  if (!Array.isArray(messages) || !messages.length || messages.length > 24) throw new HttpError(400, "Send 1 to 24 messages.");
   const out = messages.map((m) => {
-    if (!m || !["system", "user", "assistant"].includes(m.role) || typeof m.content !== "string") throw new HttpError(400, "Each message needs a role and text content.");
-    return { role: m.role, content: m.content };
+    if (!m || !["system", "user", "assistant", "tool"].includes(m.role)) throw new HttpError(400, "Each message needs a role: system, user, assistant or tool.");
+    let content = typeof m.content === "string" ? m.content
+      : Array.isArray(m.content) ? m.content.filter((p) => p?.type === "text").map((p) => p.text).join("\n") : "";
+    if (m.role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length)
+      content = (content ? content + "\n" : "") + m.tool_calls.map((c) => `[called ${c.function?.name}(${c.function?.arguments || ""})]`).join("\n");
+    if (m.role === "tool") return { role: "user", content: `Result of the tool call:\n${content}` };
+    if (Array.isArray(m.content) && m.content.some((p) => p?.type === "image_url")) throw new HttpError(400, "The lab model reads text only; it cannot look at images.");
+    return { role: m.role, content };
   });
   if (out.reduce((a, m) => a + m.content.length, 0) > MAX_CHARS) throw new HttpError(413, `Prompt too long for the lab model (over ${MAX_CHARS} characters).`);
   return out;
+}
+
+/** Workers AI tool calls ({name, arguments}) in OpenAI's shape. */
+export function toolCalls(result) {
+  const calls = result?.tool_calls || result?.choices?.[0]?.message?.tool_calls;
+  if (!Array.isArray(calls) || !calls.length) return null;
+  return calls.map((c, i) => {
+    const name = c.function?.name || c.name, args = c.function?.arguments ?? c.arguments ?? {};
+    return { id: c.id || `call_${Date.now().toString(36)}_${i}`, type: "function", function: { name, arguments: typeof args === "string" ? args : JSON.stringify(args) } };
+  });
 }
 
 export function replyText(result) {
@@ -75,14 +93,26 @@ export const onRequestPost = handle(async ({ request, env }) => {
   const client = /^[a-z0-9-]{8,64}$/i.test(request.headers.get("x-lab-client") || "") ? request.headers.get("x-lab-client") : "";
   const usage = await countUse(env, request.headers.get("cf-connecting-ip") || "unknown", client, lang);
   const model = env.LLM_MODEL || DEFAULT_MODEL;
+  const input = { messages, max_tokens: max, temperature };
+  if (Array.isArray(b.tools) && b.tools.length) input.tools = b.tools.slice(0, 8);
+  if (b.response_format && ["json_object", "json_schema"].includes(b.response_format.type)) input.response_format = b.response_format;
   let result;
-  try { result = await env.AI.run(model, { messages, max_tokens: max, temperature }); }
+  try { result = await env.AI.run(model, input); }
   catch (e) {
     const m = String(e.message || e);
     if (/4006|neuron|allocation|quota|rate limit/i.test(m)) throw new HttpError(429, (MSG[lang] || MSG.en).day);   // Cloudflare's own daily limit
     throw new HttpError(502, `The lab model did not answer: ${m.slice(0, 160)}`);
   }
-  return json({ object: "chat.completion", model: "lab", choices: [{ index: 0, message: { role: "assistant", content: replyText(result) }, finish_reason: "stop" }], lab: usage });
+  const calls = input.tools ? toolCalls(result) : null, text = calls ? null : replyText(result);
+  const id = "lab-" + Date.now().toString(36), created = Math.floor(Date.now() / 1000);
+  const message = { role: "assistant", content: text, ...(calls ? { tool_calls: calls } : {}) }, finish = calls ? "tool_calls" : "stop";
+  const usageInfo = { prompt_tokens: result?.usage?.prompt_tokens || 0, completion_tokens: result?.usage?.completion_tokens || 0, total_tokens: result?.usage?.total_tokens || 0 };
+  if (b.stream) {   // one chunk with the whole answer, so streaming clients (lesson 27) work too
+    const chunk = (delta, fr) => `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model: "lab", choices: [{ index: 0, delta, finish_reason: fr }] })}\n\n`;
+    const body = chunk({ role: "assistant", content: text || "" }, null) + chunk({}, finish) + "data: [DONE]\n\n";
+    return new Response(body, { headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store" } });
+  }
+  return json({ id, object: "chat.completion", created, model: "lab", choices: [{ index: 0, message, finish_reason: finish }], usage: usageInfo, lab: usage });
 });
 
 export const onRequestGet = () => json({ ok: true, info: "POST OpenAI-style chat messages here." });

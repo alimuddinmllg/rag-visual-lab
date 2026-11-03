@@ -1,5 +1,6 @@
 # NalarNusa RAG Visual Lab · Lesson 26 · Incremental sync of a folder into a vector database, with content hashes as ids
-# pip install chromadb        (uses Chroma's built-in small embedding model)
+# pip install chromadb
+# Uses Chroma's built-in small embedding model (downloaded on first use).
 import hashlib
 import pathlib
 import chromadb
@@ -49,6 +50,9 @@ def sync(folder):
 # @stage answer
 if __name__ == "__main__":
     FOLDER.mkdir(exist_ok=True)
+    if not any(FOLDER.iterdir()) and pathlib.Path("handbook.txt").exists():     # no documents yet: one file per handbook section
+        for n, part in enumerate(open("handbook.txt", encoding="utf-8").read().split("\n## ")):
+            (FOLDER / f"section_{n + 1:02d}.md").write_text("## " + part.lstrip("# "), encoding="utf-8")
     sync(FOLDER)                                                   # run it again after editing files: only changes are embedded
     res = col.query(query_texts=["When is the lab open on Saturday?"], n_results=3)
     for doc, meta in zip(res["documents"][0], res["metadatas"][0]):

@@ -1,11 +1,14 @@
 # NalarNusa RAG Visual Lab · Lesson 29 · GraphRAG with an LLM extractor and networkx
-# pip install networkx openai        (any OpenAI-compatible endpoint, e.g. Ollama)
+# pip install networkx openai
+# Any OpenAI-compatible endpoint works, e.g. Ollama.
+import os
 import json
 import networkx as nx
 from openai import OpenAI
 
-llm = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-MODEL = "llama3.2"
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+llm = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))
+MODEL = os.environ.get("LLM_MODEL", "llama3.2")
 chunks = open("handbook.md", encoding="utf-8").read().split("\n\n")
 
 # @stage extract

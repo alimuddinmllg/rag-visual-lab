@@ -4,11 +4,17 @@ import json
 import logging
 import time
 
-logging.basicConfig(filename="rag_trace.jsonl", level=logging.INFO, format="%(message)s")
+log = logging.getLogger("rag_trace")
+log.setLevel(logging.INFO)
+if not log.handlers:
+    h = logging.FileHandler("rag_trace.jsonl", encoding="utf-8"); h.setFormatter(logging.Formatter("%(message)s")); log.addHandler(h)
+log.propagate = False
 
 
 def trace(stage, **data):
-    logging.info(json.dumps({"t": time.time(), "stage": stage, **data}, ensure_ascii=False))
+    log.info(json.dumps({"t": time.time(), "stage": stage, **data}, ensure_ascii=False))
+    for handler in log.handlers:
+        handler.flush()
 
 
 # @stage observe

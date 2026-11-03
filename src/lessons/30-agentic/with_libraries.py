@@ -1,13 +1,15 @@
 # NalarNusa RAG Visual Lab · Lesson 30 · An agent with a real LLM: the model decides when to call the search tool
 # pip install openai numpy sentence-transformers
 # Needs a model that supports tool calling, e.g. Ollama with llama3.1 or qwen2.5, or any hosted OpenAI-compatible API.
+import os
 import json
 import numpy as np
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-MODEL = "qwen2.5"
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+client = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))
+MODEL = os.environ.get("LLM_MODEL", "qwen2.5")
 MAX_STEPS = 4                                                     # the step budget
 
 # @stage plan

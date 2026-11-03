@@ -1,11 +1,14 @@
 # NalarNusa RAG Visual Lab · Lesson 21 · Faithfulness with an LLM judge (the idea behind RAGAS)
 # pip install openai
 # Libraries such as ragas and deepeval package this; this file shows what they do inside.
+import os
 import json
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")   # any OpenAI-compatible server
-ask = lambda p: client.chat.completions.create(model="qwen2.5:7b-instruct", temperature=0,
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+client = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))   # any OpenAI-compatible server
+MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b-instruct")
+ask = lambda p: client.chat.completions.create(model=MODEL, temperature=0,
                                                messages=[{"role": "user", "content": p}]).choices[0].message.content
 
 # @stage retrieve

@@ -1,9 +1,12 @@
 # NalarNusa RAG Visual Lab · Lesson 19 · Let an LLM reword the drafts, then review them yourself
 # pip install openai
+import os
 import json
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")   # any OpenAI-compatible server
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+client = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))   # any OpenAI-compatible server
+MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b-instruct")
 
 # @stage facts
 drafts = json.load(open("test_set.json", encoding="utf-8"))   # from test_set.py: [[draft question, fact], ...]
@@ -12,7 +15,7 @@ drafts = json.load(open("test_set.json", encoding="utf-8"))   # from test_set.py
 # @stage draft
 def reword(draft, fact):
     sentence = draft.split(": ", 1)[-1].replace("___", fact)
-    r = client.chat.completions.create(model="qwen2.5:7b-instruct", temperature=0.7, messages=[{"role": "user", "content":
+    r = client.chat.completions.create(model=MODEL, temperature=0.7, messages=[{"role": "user", "content":
         "Write one short, natural question that a student would ask and that this sentence answers. "
         "Use different words from the sentence where you can. Reply with the question only, in the same "
         f"language as the sentence.\nSentence: {sentence}"}])

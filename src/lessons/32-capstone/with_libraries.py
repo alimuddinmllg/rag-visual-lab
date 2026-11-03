@@ -1,6 +1,7 @@
 # NalarNusa RAG Visual Lab · Lesson 32 · Your RAG with production libraries: neural embeddings, BM25, fusion, evaluation, an LLM
 # pip install sentence-transformers rank-bm25 numpy openai
 # Put your document in my_document.txt and your test set (from lesson 19) in my_tests.json: [["question", "phrase"], ...]
+import os
 import json
 import re
 import numpy as np
@@ -9,8 +10,9 @@ from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 
 SIZE, K, MIN_SIM = 60, 3, 0.35          # neural cosine scores run higher than TF-IDF: re-tune the threshold
-llm = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")    # or any OpenAI-compatible service
-MODEL = "llama3.2"
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+llm = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))    # or any OpenAI-compatible service
+MODEL = os.environ.get("LLM_MODEL", "llama3.2")
 
 # @stage load
 text = open("my_document.txt", encoding="utf-8").read()

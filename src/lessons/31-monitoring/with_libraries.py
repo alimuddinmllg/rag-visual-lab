@@ -49,6 +49,16 @@ def drill(day, path=LOG):
 
 
 if __name__ == "__main__":
+    import os, random
+    if not os.path.exists(LOG):                     # no real log yet: two weeks of example traffic, with two bad days
+        r = random.Random(7); now = time.time()
+        for d in range(14):
+            for _ in range(r.randint(20, 40)):
+                cover = r.random() * 0.6 if d in (9, 10) else 0.47 + r.random() * 0.53
+                with open(LOG, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"ts": now - (13 - d) * 86400 + r.random() * 3600, "q": r.choice(["PLA price?", "Saturday hours?", "CNC machine?"]),
+                                        "chunks": [1], "cover": cover, "empty": cover < 0.5, "ms": r.uniform(600, 1400), "answer": "",
+                                        "feedback": r.choice([None, None, "up", "down" if cover < 0.5 else "up"])}) + "\n")
     days = daily()
     print(days.tail(7))
     for day, metric, value in check(days):

@@ -23,8 +23,8 @@ const T = {
     own: (file) => `This lesson's code (\`${file}\`).`,
     run: "Run it with the settings from the Data cell:",
     part2: "## Part 2 · With libraries",
-    part2note: "Installs the packages, then runs the library version. Cells that call an LLM expect an OpenAI-compatible server at `http://localhost:11434/v1` (Ollama on your own computer). In Colab, change `base_url` and `api_key` to a hosted service you have access to.",
-    pdfNote: "This part reads `handbook.pdf` and `handbook.docx`. Upload your own files with those names first (in Colab: the folder icon on the left).",
+    part2note: "Installs the packages, then runs the library version. The first cell picks the LLM: in Colab it uses the lab's free model (a daily limit applies); on your own computer, Ollama at `http://localhost:11434/v1`. Set `LLM_BASE_URL`, `LLM_API_KEY` and `LLM_MODEL` to use another OpenAI-compatible service.",
+    pdfNote: "This part reads `handbook.pdf` and `handbook.docx`. Without files of your own it makes sample ones from the handbook; to use yours, upload them with those names first (in Colab: the folder icon on the left).",
   },
   id: {
     intro: (n, title) => `# NalarNusa RAG Visual Lab · Pelajaran ${n}: ${title}\n\nKode yang sama dengan tab Kode di lab, dalam satu notebook. [Buka pelajaran ini di lab](${LAB_URL}/#lesson-${String(n).padStart(2, "0")}).\n\n- **Bagian 1** langsung berjalan: Python biasa dan numpy, dengan pengaturan di bawah. Hasilnya sama dengan visual.\n- **Bagian 2** adalah ide yang sama dengan pustaka umum. Bagian ini memasang paket dulu, dan sebagian memanggil LLM.`,
@@ -34,10 +34,20 @@ const T = {
     own: (file) => `Kode pelajaran ini (\`${file}\`).`,
     run: "Jalankan dengan pengaturan dari sel Data:",
     part2: "## Bagian 2 · Dengan pustaka",
-    part2note: "Memasang paket, lalu menjalankan versi pustaka. Sel yang memanggil LLM mengharapkan server yang kompatibel dengan OpenAI di `http://localhost:11434/v1` (Ollama di komputer Anda). Di Colab, ganti `base_url` dan `api_key` ke layanan daring yang Anda punya.",
-    pdfNote: "Bagian ini membaca `handbook.pdf` dan `handbook.docx`. Unggah file Anda sendiri dengan nama itu dulu (di Colab: ikon folder di kiri).",
+    part2note: "Memasang paket, lalu menjalankan versi pustaka. Sel pertama memilih LLM: di Colab memakai model gratis dari lab (ada batas harian); di komputer Anda sendiri, Ollama di `http://localhost:11434/v1`. Atur `LLM_BASE_URL`, `LLM_API_KEY`, dan `LLM_MODEL` untuk memakai layanan lain yang kompatibel dengan OpenAI.",
+    pdfNote: "Bagian ini membaca `handbook.pdf` dan `handbook.docx`. Tanpa file Anda sendiri, dibuatkan file contoh dari buku panduan; untuk memakai file Anda, unggah dengan nama itu dulu (di Colab: ikon folder di kiri).",
   },
 };
+
+// Part 2's first cell: which LLM the "with libraries" code calls.
+const LLM_SETUP = [
+  "import os, sys",
+  "# In Colab: the lab's free model (OpenAI-compatible, daily limit). On your own computer: Ollama.",
+  "# To use another service, set these three yourself before running the next cells.",
+  "if \"google.colab\" in sys.modules and \"LLM_BASE_URL\" not in os.environ:",
+  `    os.environ.update(LLM_BASE_URL="${LAB_URL}/api/llm", LLM_API_KEY="lab", LLM_MODEL="lab")`,
+  "print(\"LLM:\", os.environ.get(\"LLM_BASE_URL\", \"http://localhost:11434/v1 (Ollama)\"))",
+].join("\n");
 
 const lines = (s) => { const a = s.replace(/\s+$/, "").split("\n"); return a.map((l, i) => (i < a.length - 1 ? l + "\n" : l)); };
 const md = (s) => ({ cell_type: "markdown", metadata: {}, source: lines(s) });
@@ -63,12 +73,14 @@ export function buildNotebook({ n, title, lang, files, python }) {
     "general_knowledge.txt": docLang === "id" ? GENERAL_ID : GENERAL_EN,
     "stopwords.json": JSON.stringify({ en: STOPWORDS.en, id: STOPWORDS.id }),
     "test_set.json": JSON.stringify(tests, null, 1),
+    // names some "with libraries" files use for the same document and test set
+    "handbook.md": docText, "my_document.txt": docText, "my_tests.json": JSON.stringify(tests, null, 1),
   };
   const cells = [md(t.intro(n, title)), md(t.data)];
   cells.push(code([
     "import json",
     "",
-    "# Files the code reads: the document you used in the lab (saved as handbook.txt and nusabot_handbook.txt), its test set, stopwords.",
+    "# Files the code reads: the document you used in the lab (saved as handbook.txt, nusabot_handbook.txt, handbook.md, my_document.txt), its test set, stopwords.",
     `for name, text in json.loads(${pyStr(JSON.stringify(dataFiles))}).items():`,
     "    with open(name, \"w\", encoding=\"utf-8\") as f:",
     "        f.write(text)",
@@ -88,9 +100,11 @@ export function buildNotebook({ n, title, lang, files, python }) {
     cells.push(code(`result = ${python.call}`));
   }
   if (libs) {
-    const pip = (libs.source.match(/^# pip install (.+)$/m) || [])[1];
+    // the package list only: anything after two spaces or a "(" on that line is a comment
+    const pip = ((libs.source.match(/^# pip install (.+)$/m) || [])[1] || "").split(/\s{2,}|\s\(/)[0].trim();
     cells.push(md(t.part2 + "\n\n" + t.part2note + (/handbook\.pdf/.test(libs.source) ? "\n\n" + t.pdfNote : "")));
-    if (pip) cells.push(code(`%pip install -q ${pip.trim()}`));
+    cells.push(code(LLM_SETUP));
+    if (pip) cells.push(code(`%pip install -q ${pip}`));
     cells.push(code(parseStages(libs.source).code.trim()));
   }
   const nb = {

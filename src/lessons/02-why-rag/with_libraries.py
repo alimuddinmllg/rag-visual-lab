@@ -1,11 +1,13 @@
 # NalarNusa RAG Visual Lab · Lesson 2 · Closed book vs open book, with a real LLM
 # pip install openai sentence-transformers
 # Works with any OpenAI-compatible server. For Ollama:  ollama pull qwen2.5:7b-instruct
+import os
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer, util
 
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-MODEL = "qwen2.5:7b-instruct"
+# LLM: Ollama on your computer by default. The notebook sets LLM_BASE_URL / LLM_MODEL to the lab's free model when it runs in Colab.
+client = OpenAI(base_url=os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"), api_key=os.environ.get("LLM_API_KEY", "ollama"))
+MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b-instruct")
 QUESTION = "How much does PLA printing cost in the NusaBot Robotics Lab?"
 
 

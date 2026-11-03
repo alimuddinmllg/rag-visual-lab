@@ -6,6 +6,7 @@ from llama_index.core.postprocessor import MetadataReplacementPostProcessor
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 Settings.embed_model = HuggingFaceEmbedding("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+Settings.llm = None                       # this lesson only retrieves; no LLM (and no OpenAI key) needed
 text = open("nusabot_handbook.txt", encoding="utf-8").read()
 
 # @stage small
