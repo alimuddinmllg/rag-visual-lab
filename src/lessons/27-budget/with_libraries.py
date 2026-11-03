@@ -49,6 +49,7 @@ for part in stream:
 end = time.perf_counter()
 timings["first token"] = (first - start) * 1000 if first else 0
 timings["generate"] = (end - (first or start)) * 1000
+# The lab's free model in Colab sends the whole answer as one chunk, so "first token" holds all of it there.
 # @end
 
 # @stage cost

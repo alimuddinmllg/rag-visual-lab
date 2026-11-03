@@ -159,7 +159,7 @@ export default {
   ],
   code: [
     { id: "mm", label: L("Region-aware chunks (runs here)", "Potongan per wilayah (bisa dijalankan)"), source: pySource, runnable: true, filename: "multimodal.py" },
-    { id: "libs", label: L("With a PDF parser and a vision model", "Dengan parser PDF dan model visi"), source: libSource, runnable: false, filename: "multimodal_libraries.py", note: L("Runs on your computer after: pip install pdfplumber pymupdf openai", "Jalankan di komputer Anda setelah: pip install pdfplumber pymupdf openai") },
+    { id: "libs", label: L("With a PDF parser and a vision model", "Dengan parser PDF dan model visi"), source: libSource, runnable: false, filename: "multimodal_libraries.py", note: L("Runs on your computer after: pip install \"pdfplumber<0.11.10\" pymupdf openai fpdf2", "Jalankan di komputer Anda setelah: pip install \"pdfplumber<0.11.10\" pymupdf openai fpdf2") },
   ],
   variables: (c) => [["chunks", c.chunks ? String(c.chunks.length) : "—"], ["top", c.top ? JSON.stringify(c.top.map((x) => x.i)) : "—"], ["found", c.found != null ? String(c.found) : "—"]],
   python: (c) => {

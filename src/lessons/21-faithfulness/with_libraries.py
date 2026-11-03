@@ -11,6 +11,10 @@ MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b-instruct")
 ask = lambda p: client.chat.completions.create(model=MODEL, temperature=0,
                                                messages=[{"role": "user", "content": p}]).choices[0].message.content
 
+def json_list(reply):
+    """Models often wrap JSON in ``` fences or add a sentence around it: keep only the [...] part."""
+    return json.loads(reply[reply.find("["):reply.rfind("]") + 1])
+
 # @stage retrieve
 sources = ["PLA prints cost Rp 2.000 per gram.", "Resin prints cost Rp 5.000 per millilitre."]   # your top-k chunks
 # @end
@@ -20,7 +24,7 @@ answer = "PLA printing costs Rp 2.000 per gram. Students get a 50% discount on F
 # @end
 
 # @stage claims
-claims = json.loads(ask(f"Split this answer into short standalone factual claims. Reply with a JSON list of strings only.\n{answer}"))
+claims = json_list(ask(f"Split this answer into short standalone factual claims. Reply with a JSON list of strings only.\n{answer}"))
 # @end
 
 # @stage check

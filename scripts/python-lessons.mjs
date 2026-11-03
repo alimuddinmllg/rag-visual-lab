@@ -19,6 +19,7 @@ if (!PY) { console.error("No Python with numpy found."); process.exit(1); }
 const server = await createServer({ logLevel: "error", server: { middlewareMode: true }, appType: "custom" });
 const { LESSONS } = await server.ssrLoadModule("/src/lessons/index.js");
 const { DOCUMENTS } = await server.ssrLoadModule("/src/documents/nusabot.js");
+const { computeContext } = await server.ssrLoadModule("/src/engine/useLessonRunner.js"); // the full context, as the lab shows it
 const { parseStages } = await server.ssrLoadModule("/src/toolkit/CodeView.jsx");
 const { stripLocalImports } = await server.ssrLoadModule("/src/toolkit/pyodide.js");
 const dir = mkdtempSync(join(tmpdir(), "pylessons-"));
@@ -34,7 +35,7 @@ for (const [n, lesson] of Object.entries(LESSONS)) {
     const values = { ...(lesson.extraValues || {}), ...Object.fromEntries((lesson.controls || []).map((c) => [c.id, c.default])) };
     const question = lesson.defaultQuestion ? lesson.defaultQuestion[lang] || lesson.defaultQuestion.en : "";
     const inputs = { ...values, question, doc, lang: lesson.inputs?.document ? doc.lang : lang, uiLang: lang, neural: null, ...JSON.parse(process.env.INPUTS || "{}") };
-    const py = lesson.python({ inputs });
+    const py = lesson.python(computeContext(lesson.stages, inputs, lesson.stages.length));
     const own = stripLocalImports(parseStages(file.source).code);
     const script = join(dir, `l${n}_${lang}.py`);
     writeFileSync(script, [

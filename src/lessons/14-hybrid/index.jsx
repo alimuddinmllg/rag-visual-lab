@@ -90,7 +90,7 @@ export default {
   code: [
     { id: "rrf", label: L("Hybrid search (runs here)", "Pencarian hibrida (bisa dijalankan)"), source: pySource, runnable: true, filename: "fusion.py" },
     { id: "libs", label: L("With LangChain", "Dengan LangChain"), source: libSource, runnable: false, filename: "hybrid_libraries.py",
-      note: L("Runs on your computer after: pip install langchain langchain-community langchain-huggingface rank-bm25 faiss-cpu", "Jalankan di komputer Anda setelah: pip install langchain langchain-community langchain-huggingface rank-bm25 faiss-cpu") },
+      note: L("Runs on your computer after: pip install langchain langchain-classic langchain-community langchain-huggingface rank-bm25 faiss-cpu", "Jalankan di komputer Anda setelah: pip install langchain langchain-classic langchain-community langchain-huggingface rank-bm25 faiss-cpu") },
   ],
   python: (c) => {
     const I = c.inputs, doc = I.doc, lang = doc.lang, tests = evalSet(doc);

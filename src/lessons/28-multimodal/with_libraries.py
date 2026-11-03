@@ -1,5 +1,6 @@
 # NalarNusa RAG Visual Lab · Lesson 28 · Region-aware chunks from a real PDF: text, table rows with headers, described images
-# pip install pdfplumber pymupdf openai fpdf2 pillow
+# pip install "pdfplumber<0.11.10" pymupdf openai fpdf2
+# (pdfplumber 0.11.10 upgrades Pillow, which crashes a running Colab session; the older one works the same here)
 # Describing images needs a vision model, e.g. Ollama with: ollama pull llava. The lab's free model reads text only,
 # so in Colab the image falls back to its caption and you see why descriptions matter.
 import base64

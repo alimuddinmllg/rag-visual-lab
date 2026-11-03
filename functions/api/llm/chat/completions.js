@@ -47,7 +47,9 @@ export function toolCalls(result) {
 
 export function replyText(result) {
   const raw = typeof result === "string" ? result : result?.response ?? result?.choices?.[0]?.message?.content ?? "";
-  return String(raw).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Workers AI parses a reply that is valid JSON (a list, an object) for us: turn it back into text.
+  const text = raw !== null && typeof raw === "object" ? JSON.stringify(raw) : String(raw);
+  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 }
 
 const MSG = {

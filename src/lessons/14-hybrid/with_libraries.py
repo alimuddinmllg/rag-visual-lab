@@ -1,6 +1,9 @@
 # NalarNusa RAG Visual Lab · Lesson 14 · Hybrid search with LangChain's EnsembleRetriever
-# pip install langchain langchain-community langchain-huggingface rank-bm25 faiss-cpu
-from langchain.retrievers import EnsembleRetriever
+# pip install langchain langchain-classic langchain-community langchain-huggingface rank-bm25 faiss-cpu
+try:
+    from langchain_classic.retrievers import EnsembleRetriever   # LangChain 1.x
+except ImportError:
+    from langchain.retrievers import EnsembleRetriever           # LangChain 0.x
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings

@@ -17,6 +17,7 @@ const server = await createServer({ logLevel: "error", server: { middlewareMode:
 const { LESSONS } = await server.ssrLoadModule("/src/lessons/index.js");
 const { CURRICULUM } = await server.ssrLoadModule("/src/engine/registry.js");
 const { DOCUMENTS } = await server.ssrLoadModule("/src/documents/nusabot.js");
+const { computeContext } = await server.ssrLoadModule("/src/engine/useLessonRunner.js"); // the full context, as the lab shows it
 const { buildNotebook, notebookName } = await server.ssrLoadModule("/src/toolkit/notebook.js");
 
 const PY = CHECK && ["python3", "python", "py"].find((c) => spawnSync(c, ["-c", "import numpy"], { stdio: "ignore" }).status === 0);
@@ -31,7 +32,7 @@ for (const [num, lesson] of Object.entries(LESSONS)) {
     const values = { ...(lesson.extraValues || {}), ...Object.fromEntries((lesson.controls || []).map((c) => [c.id, c.default])) };
     const question = lesson.defaultQuestion ? lesson.defaultQuestion[lang] || lesson.defaultQuestion.en : "";
     const inputs = { ...values, question, doc, lang: lesson.inputs?.document ? doc.lang : lang, uiLang: lang, neural: null };
-    const python = lesson.python ? lesson.python({ inputs }) : null;
+    const python = lesson.python ? lesson.python(computeContext(lesson.stages, inputs, lesson.stages.length)) : null;
     const title = CURRICULUM.find((l) => l.n === +num).title[lang];
     const text = buildNotebook({ n: +num, title, lang, files: lesson.code, python });
     const path = join(out, notebookName(+num, lang));
