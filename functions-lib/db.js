@@ -33,6 +33,21 @@ export const SCHEMA = [
     rating INTEGER,
     text TEXT
   )`,
+  // Visit statistics: one row per page view. vid is a daily code (hash of network + browser code + day + secret),
+  // so a visitor can be counted once per day but not followed from day to day. No IP address is stored.
+  `CREATE TABLE IF NOT EXISTS visits (
+    day TEXT NOT NULL,
+    vid TEXT NOT NULL,
+    first INTEGER NOT NULL DEFAULT 0,
+    page TEXT,
+    lang TEXT,
+    country TEXT,
+    region TEXT,
+    city TEXT,
+    device TEXT,
+    ref TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS visits_day ON visits (day)`,
 ];
 
 let ready = false;
@@ -68,4 +83,22 @@ export function handle(fn) {
       return json({ ok: false, error: "Server error." }, 500);
     }
   };
+}
+
+/** Constant-time comparison for the researcher key. */
+export function safeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  let x = 0;
+  for (let i = 0; i < a.length; i++) x |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return x === 0;
+}
+
+export function requireKey(request, env) {
+  if (!env.EXPORT_KEY) throw new HttpError(503, "EXPORT_KEY is not set in Cloudflare.");
+  if (!safeEqual((request.headers.get("authorization") || "").replace(/^Bearer\s+/i, ""), env.EXPORT_KEY)) throw new HttpError(401, "Wrong key.");
+}
+
+export async function sha256(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
 }

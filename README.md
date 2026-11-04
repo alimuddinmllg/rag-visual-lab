@@ -73,6 +73,7 @@ The server parts are optional and set in the Pages project (Settings → Binding
 | secret `EXPORT_KEY` | downloading pilot data; also salts the lab model's daily counters |
 | Workers AI `AI` | the lab's model (`/api/llm`) |
 | `LLM_PER_USER`, `LLM_PER_IP`, `LLM_PER_DAY`, `LLM_MODEL` (optional) | lab model limits per day: 60 per person (browser), 600 per network (a class on one Wi-Fi), 1200 in total; and the model (default `@cf/meta/llama-3.1-8b-instruct-fp8-fast`). Usage per day: `#pilot/admin` → Lab model usage |
+| (no setting needed) | visitor statistics: each page view is counted in the D1 table `visits` (page, language, country/province/city from Cloudflare, device, referring site, a daily visitor code; no IP address; kept about 13 months; skipped for Global Privacy Control / Do Not Track). View them at `#pilot/admin` → Visitors |
 
 ## How it fits together
 

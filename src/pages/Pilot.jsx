@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../i18n.js";
 import { LESSONS } from "../lessons/index.js";
+import { CURRICULUM } from "../engine/registry.js";
 import { useProgress, isComplete } from "../engine/progress.js";
 import { PILOT } from "../pilot/config.js";
 import { VERSION, KNOWLEDGE, CONFIDENCE, AGREE, SUS, susScore, scoreKnowledge } from "../pilot/instrument.js";
@@ -286,6 +287,12 @@ function Admin() {
     try { const r = await fetch("/api/llm/usage", { headers: { authorization: "Bearer " + key } }); const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); setUse(j); }
     catch (e) { setMsg(e.message); }
   };
+  const [vis, setVis] = useState(null);
+  const visits = async (days) => {
+    setMsg(null);
+    try { const r = await fetch(`/api/visits?days=${days}`, { headers: { authorization: "Bearer " + key } }); const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); setVis(j); }
+    catch (e) { setMsg(e.message); }
+  };
   const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : "—");
   return (
     <>
@@ -297,8 +304,10 @@ function Admin() {
         <button className="btn" type="button" disabled={!key} onClick={() => download("feedback")}>{tr(L("Download feedback (CSV)", "Unduh masukan (CSV)"))}</button>
         <button className="btn primary" type="button" disabled={!key} onClick={summary}>{tr(L("Show summary", "Tampilkan ringkasan"))}</button>
         <button className="btn" type="button" disabled={!key} onClick={usage}>{tr(L("Lab model usage", "Pemakaian model lab"))}</button>
+        <button className="btn" type="button" disabled={!key} onClick={() => visits(30)}>{tr(L("Visitors", "Pengunjung"))}</button>
       </div>
       {msg && <p className="note bad" role="alert">{msg}</p>}
+      {vis && <VisitStats data={vis} onRange={visits} />}
       {use && (
         <>
           <p className="note" style={{ margin: "8px 0 0" }}>{tr(L(`Limits per day: ${use.limits.per_person} answers per person, ${use.limits.per_network} per network, ${use.limits.per_day} in total. Model ${use.ai ? "connected" : "NOT connected"}.`, `Batas per hari: ${use.limits.per_person} jawaban per orang, ${use.limits.per_network} per jaringan, ${use.limits.per_day} total. Model ${use.ai ? "terhubung" : "TIDAK terhubung"}.`))}</p>
@@ -317,5 +326,46 @@ function Admin() {
         </tbody></table>
       )}
     </>
+  );
+}
+
+// Visitors: totals, a bar per day, and where people come from. Country codes come from Cloudflare's IP lookup.
+const flag = (cc) => (/^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((c) => 0x1f1a5 + c.charCodeAt(0))) : "");
+function VisitStats({ data, onRange }) {
+  const { tr, lang } = useT();
+  const names = useMemo(() => { try { return new Intl.DisplayNames([lang], { type: "region" }); } catch { return null; } }, [lang]);
+  const country = (cc) => (cc && cc !== "XX" && cc !== "T1" ? `${flag(cc)} ${names?.of(cc) || cc}` : tr(L("Unknown", "Tidak diketahui")));
+  const place = (k) => { const [cc, p] = k.split("|"); return `${p || tr(L("(unknown)", "(tidak diketahui)"))}, ${country(cc)}`; };
+  const pageLabel = (p) => { const m = p.match(/^lesson-(\d+)$/); if (m) return `${tr(L("Lesson", "Pelajaran"))} ${m[1]}${(() => { const c = CURRICULUM.find((l) => l.n === +m[1]); return c ? ": " + tr(c.title) : ""; })()}`; const v = p.match(/^level-(\d)$/); if (v) return `${tr(L("Level", "Level"))} ${v[1]}`; const P = { home: L("Home page", "Beranda"), glossary: L("Glossary", "Glosarium"), privacy: L("Privacy", "Privasi"), pilot: L("Study pages", "Halaman penelitian") }; return P[p] ? tr(P[p]) : p; };
+  const max = Math.max(1, ...data.byDay.map((d) => d.visitors));
+  const T = data.total || {};
+  const table = (title, rows, label) => (
+    <table className="lvtable" style={{ marginTop: 10 }}><thead><tr><th>{title}</th><th>{tr(L("Visitors", "Pengunjung"))}</th><th>{tr(L("Page views", "Tampilan halaman"))}</th></tr></thead>
+      <tbody>{rows.length ? rows.map((r) => <tr key={r.k}><td>{label(r.k)}</td><td>{r.visitors}</td><td>{r.views}</td></tr>) : <tr><td colSpan={3}>—</td></tr>}</tbody></table>
+  );
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <b>{tr(L("Visitors", "Pengunjung"))}</b>
+        {[7, 30, 90, 365].map((n) => <button key={n} className={"btn" + (data.days === n ? " primary" : "")} type="button" onClick={() => onRange(n)}>{n} {tr(L("days", "hari"))}</button>)}
+      </div>
+      <table className="lvtable" style={{ marginTop: 8 }}><tbody>
+        <tr><th>{tr(L("Visitors (each browser once per day)", "Pengunjung (tiap browser sekali per hari)"))}</th><td>{T.visitors || 0}</td></tr>
+        <tr><th>{tr(L("New visitors (first time on the lab)", "Pengunjung baru (pertama kali ke lab)"))}</th><td>{T.new_visitors || 0}</td></tr>
+        <tr><th>{tr(L("Page views", "Tampilan halaman"))}</th><td>{T.views || 0}</td></tr>
+        <tr><th>{tr(L("Countries", "Negara"))}</th><td>{T.countries || 0}</td></tr>
+      </tbody></table>
+      <div role="img" aria-label={tr(L("Visitors per day", "Pengunjung per hari"))} style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 110, marginTop: 10, borderBottom: "1px solid var(--line)" }}>
+        {data.byDay.map((d) => <div key={d.day} title={`${d.day}: ${d.visitors} / ${d.views}`} style={{ flex: 1, minWidth: 3, height: `${(100 * d.visitors) / max}%`, background: "var(--query)", borderRadius: "2px 2px 0 0" }} />)}
+      </div>
+      <p className="note" style={{ margin: "4px 0 0" }}>{data.byDay.length ? `${data.byDay[0].day} → ${data.byDay[data.byDay.length - 1].day} (UTC)` : tr(L("No visits recorded yet.", "Belum ada kunjungan tercatat."))}</p>
+      {table(tr(L("Country", "Negara")), data.countries, country)}
+      {table(tr(L("Province / region", "Provinsi / wilayah")), data.regions, place)}
+      {table(tr(L("City", "Kota")), data.cities, place)}
+      {table(tr(L("Came from (other sites)", "Datang dari (situs lain)")), data.refs, (k) => k || tr(L("Direct (typed, bookmark, app, or the site was not shared)", "Langsung (diketik, bookmark, aplikasi, atau situsnya tidak dibagikan)")))}
+      {table(tr(L("Device", "Perangkat")), data.devices, (k) => tr({ desktop: L("Computer", "Komputer"), mobile: L("Phone", "Ponsel"), tablet: L("Tablet", "Tablet") }[k] || L(k, k)))}
+      {table(tr(L("Language", "Bahasa")), data.langs, (k) => (k === "id" ? "Bahasa Indonesia" : "English"))}
+      {table(tr(L("Page", "Halaman")), data.pages, pageLabel)}
+    </div>
   );
 }

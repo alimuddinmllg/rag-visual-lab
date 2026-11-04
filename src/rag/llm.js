@@ -30,7 +30,7 @@ export const llmReady = (s = settings) => !!(s.enabled && s.baseUrl && s.model);
 export const enableLabModel = () => saveLLM({ ...PRESETS.lab, enabled: true });
 
 /** A random code kept in this browser, so the lab model counts people on a shared Wi-Fi separately. */
-function clientId() {
+export function clientId() {
   try {
     let id = localStorage.getItem("lab-client-id");
     if (!id) { id = (crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36)); localStorage.setItem("lab-client-id", id); }

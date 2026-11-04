@@ -13,6 +13,7 @@ import { LessonList } from "./toolkit/basics.jsx";
 import { DocsProvider } from "./documents/store.jsx";
 import LLMSettings from "./toolkit/LLMSettings.jsx";
 import { useProgress, isComplete } from "./engine/progress.js";
+import { trackPage } from "./engine/visits.js";
 
 // Routes: #home (default), #lesson-NN, #level-N, #glossary, #glossary/<term id>, #pilot, #pilot/<pre|post|withdraw|admin>
 const readHash = () => {
@@ -81,6 +82,7 @@ export default function App() {
     addEventListener("hashchange", on);
     return () => removeEventListener("hashchange", on);
   }, []);
+  useEffect(() => { trackPage(route, lang); }, [route]);   // visit statistics (see Privacy)
   const setLang = (l) => { setLangState(l); try { localStorage.setItem("lab-lang", l); } catch { /* ignore */ } };
   return (
     <LangContext.Provider value={lang}>
